@@ -7,7 +7,9 @@ import FilterBar from "../components/FilterBar.astro";
 import { getCollection } from "astro:content";
 
 const todosEditais = await getCollection("editais");
-const editais = todosEditais.filter((e) => e.data.status === "aberto");
+const editais = todosEditais.filter(
+	(e) => e.data.status === "aberto" || e.data.status === "fechando"
+);
 const abertosCount = editais.length;
 const totalCount = editais.length;
 ---

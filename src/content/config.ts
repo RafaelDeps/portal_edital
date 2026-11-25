@@ -1,7 +1,7 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { normalizeCategory } from '../utils/category.js';
-import { STATUS_VALUES, normalizeStatus } from '../utils/status.js';
+import { STATUS_VALUES, normalizeStatus, getEffectiveStatus } from '../utils/status.js';
 
 const editais = defineCollection({
   loader: glob({ pattern: "**/*.json", base: "./data" }),
@@ -19,7 +19,10 @@ const editais = defineCollection({
       data: z.string()
     })).optional().default([]),
     tags: z.array(z.string()).optional(),
-  })
+  }).transform((data) => ({
+    ...data,
+    status: getEffectiveStatus(data),
+  }))
 });
 
 export const collections = {

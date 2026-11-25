@@ -78,32 +78,55 @@ const {
 		<AccessibilityMenu />
 		<script is:inline>
 			(function () {
-				function applyFechandoStatus() {
-					var hoje = new Date();
-					hoje.setHours(0, 0, 0, 0);
+				function parseLocalDate(str) {
+					if (!str) return null;
+					var m = str.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+					if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+					var d = new Date(str);
+					if (isNaN(d.getTime())) return null;
+					d.setHours(0, 0, 0, 0);
+					return d;
+				}
+				function applyEffectiveStatus() {
+					var now = new Date();
+					var hoje = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 					var badges = document.querySelectorAll("[data-edital-status-badge]");
 					var fechandoClassCard =
 						"px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20";
 					var fechandoClassPage =
 						"px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20";
+					var encerradoClassCard =
+						"px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border-slate-200 dark:border-slate-500/20";
+					var encerradoClassPage =
+						"px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 border-slate-200 dark:border-slate-500/20";
+
 					badges.forEach(function (badge) {
 						var parent = badge.closest("[data-encerramento]");
-						if (!parent || !parent.dataset.encerramento || parent.dataset.status !== "aberto") return;
-						var dataFim = new Date(parent.dataset.encerramento);
-						dataFim.setHours(0, 0, 0, 0);
-						if (dataFim >= hoje) return;
-						parent.dataset.status = "fechando";
-						badge.textContent = "fechando";
-						badge.className =
-							badge.getAttribute("data-edital-status-size") === "page"
-								? fechandoClassPage
-								: fechandoClassCard;
+						if (!parent || !parent.dataset.encerramento) return;
+						var currentStatus = parent.dataset.status;
+						if (currentStatus !== "aberto" && currentStatus !== "fechando") return;
+
+						var dataFim = parseLocalDate(parent.dataset.encerramento);
+						if (!dataFim) return;
+
+						var diffDays = Math.round((dataFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+						var isPage = badge.getAttribute("data-edital-status-size") === "page";
+
+						if (diffDays < 0) {
+							parent.dataset.status = "encerrado";
+							badge.textContent = "encerrado";
+							badge.className = isPage ? encerradoClassPage : encerradoClassCard;
+						} else if (diffDays <= 7) {
+							parent.dataset.status = "fechando";
+							badge.textContent = "fechando";
+							badge.className = isPage ? fechandoClassPage : fechandoClassCard;
+						}
 					});
 				}
 				if (document.readyState === "loading") {
-					document.addEventListener("DOMContentLoaded", applyFechandoStatus);
+					document.addEventListener("DOMContentLoaded", applyEffectiveStatus);
 				} else {
-					applyFechandoStatus();
+					applyEffectiveStatus();
 				}
 			})();
 		</script>
