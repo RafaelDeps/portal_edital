@@ -115,4 +115,29 @@ describe('schedule-reminders.js Unit Tests', () => {
         
         assert.strictEqual(fetchCalls, 0, 'Should not send notification if already recorded in registry');
     });
+
+    test('Should escape HTML special characters in reminder payload', async () => {
+        const today = new Date().toISOString().split('T')[0];
+        const testEdital = {
+            nome: 'Edital R&I <teste>',
+            link: 'https://example.com/doc?a=1&b=2',
+            cronograma: [{ evento: 'Submissão <final> & revisão', data: today }],
+        };
+        writeFileSync(join(dataDir, 'escape_reminder.json'), JSON.stringify(testEdital));
+
+        let sentText = '';
+        global.fetch = async (url, options) => {
+            if (url.includes('createForumTopic')) {
+                return { ok: true, json: async () => ({ ok: true, result: { message_thread_id: 123 } }) };
+            }
+            sentText = JSON.parse(options.body).text;
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile);
+
+        assert.ok(sentText.includes('Edital R&amp;I &lt;teste&gt;'));
+        assert.ok(sentText.includes('Submissão &lt;final&gt; &amp; revisão'));
+        assert.ok(sentText.includes('href="https://example.com/doc?a=1&amp;b=2"'));
+    });
 });

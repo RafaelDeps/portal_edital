@@ -87,4 +87,37 @@ describe('notify-telegram.js Unit Tests', () => {
         
         assert.strictEqual(fetchCalled, false, 'Fetch should not be called for existing editals');
     });
+
+    test('Should escape HTML special characters in title, description and link', async () => {
+        const testEdital = {
+            nome: 'Chamada R&I <teste>',
+            descrição: 'Apoio a P&D & <inovação>',
+            link: 'https://example.com/edital?a=1&b=2',
+            categoria: 'pesquisa',
+            orgão_fomento: 'CNPq & FAPES',
+            cronograma: [{ evento: 'Prazo <final>', data: '2026-12-01' }],
+        };
+
+        writeFileSync(join(dataDir, 'escape.json'), JSON.stringify(testEdital));
+
+        let sentText = '';
+        global.fetch = async (url, options) => {
+            if (url.includes('createForumTopic')) {
+                return {
+                    ok: true,
+                    json: async () => ({ ok: true, result: { message_thread_id: 123 } }),
+                };
+            }
+            const body = JSON.parse(options.body);
+            sentText = body.text;
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile);
+
+        assert.ok(sentText.includes('Chamada R&amp;I &lt;teste&gt;'));
+        assert.ok(sentText.includes('Apoio a P&amp;D &amp; &lt;inovação&gt;'));
+        assert.ok(sentText.includes('href="https://example.com/edital?a=1&amp;b=2"'));
+        assert.ok(sentText.includes('CNPq &amp; FAPES'));
+    });
 });
