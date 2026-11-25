@@ -120,4 +120,85 @@ describe('notify-telegram.js Unit Tests', () => {
         assert.ok(sentText.includes('href="https://example.com/edital?a=1&amp;b=2"'));
         assert.ok(sentText.includes('CNPq &amp; FAPES'));
     });
+
+    test('Should ignore editais with status encerrado and still record them in registry', async () => {
+        writeFileSync(
+            join(dataDir, 'encerrado.json'),
+            JSON.stringify({
+                nome: 'Edital Encerrado',
+                status: 'encerrado',
+                categoria: 'pesquisa',
+                link: 'https://example.com/encerrado',
+            })
+        );
+
+        let sendCalls = 0;
+        global.fetch = async (url) => {
+            if (url.includes('sendMessage')) sendCalls++;
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile, { delayMs: 0 });
+
+        assert.strictEqual(sendCalls, 0, 'Encerrado edital should never trigger Telegram message');
+        const registry = JSON.parse(readFileSync(registryFile, 'utf-8'));
+        assert.ok(registry['encerrado.json'], 'Encerrado edital should be recorded in registry');
+    });
+
+    test('Should send a single summary message when new editais exceed maxIndividual', async () => {
+        for (let i = 1; i <= 5; i++) {
+            writeFileSync(
+                join(dataDir, `edital_${i}.json`),
+                JSON.stringify({
+                    nome: `Edital ${i}`,
+                    status: 'aberto',
+                    orgão_fomento: i <= 3 ? 'Horizon Europe' : 'FAPES',
+                    categoria: 'pesquisa',
+                    link: `https://example.com/${i}`,
+                })
+            );
+        }
+
+        const sentMessages = [];
+        global.fetch = async (url, options) => {
+            if (url.includes('sendMessage')) {
+                sentMessages.push(JSON.parse(options.body).text);
+            }
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile, { maxIndividual: 3, delayMs: 0 });
+
+        assert.strictEqual(sentMessages.length, 1, 'Should send exactly 1 summary message');
+        assert.ok(sentMessages[0].includes('5 novos editais disponíveis'));
+        assert.ok(sentMessages[0].includes('Horizon Europe'));
+        assert.ok(sentMessages[0].includes('FAPES'));
+
+        const registry = JSON.parse(readFileSync(registryFile, 'utf-8'));
+        assert.strictEqual(Object.keys(registry).length, 5, 'All 5 editais should be registered');
+    });
+
+    test('Should populate registry without sending any messages in seed mode', async () => {
+        writeFileSync(
+            join(dataDir, 'seed1.json'),
+            JSON.stringify({ nome: 'Seed 1', status: 'aberto', categoria: 'pesquisa' })
+        );
+        writeFileSync(
+            join(dataDir, 'seed2.json'),
+            JSON.stringify({ nome: 'Seed 2', status: 'encerrado', categoria: 'bolsa' })
+        );
+
+        let fetchCalls = 0;
+        global.fetch = async () => {
+            fetchCalls++;
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile, { seed: true, delayMs: 0 });
+
+        assert.strictEqual(fetchCalls, 0, 'Seed mode must never call Telegram API');
+        const registry = JSON.parse(readFileSync(registryFile, 'utf-8'));
+        assert.ok(registry['seed1.json']);
+        assert.ok(registry['seed2.json']);
+    });
 });

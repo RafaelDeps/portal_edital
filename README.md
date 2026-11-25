@@ -121,7 +121,8 @@ O workflow **Daily Data Sync and Deploy** usa esses secrets para rodar `notify-t
 |--------|-----------|
 | `node scripts/load-env.js` | Carregado automaticamente pelos outros scripts; lê `.env` e preenche `process.env`. |
 | `node scripts/build-registry.js` | (Re)cria `registry/downloads_registry.json` e `registry/topics_registry.json` a partir dos JSON em `data/`. Não envia mensagens. |
-| `node scripts/notify-telegram.js` | Envia no Telegram notificação de **novos editais** (arquivos ainda não presentes no registry). |
+| `node scripts/notify-telegram.js` | Envia no Telegram notificação de **novos editais** abertos (acima de `TELEGRAM_MAX_INDIVIDUAL`, padrão `10`, envia um resumo único agrupado por órgão). |
+| `node scripts/notify-telegram.js --seed` | Popula `registry/downloads_registry.json` com os arquivos atuais em `data/` **sem enviar mensagens** ao Telegram (recomendado antes da primeira ativação dos secrets). |
 | `node scripts/schedule-reminders.js` | Envia **lembretes** no Telegram para eventos do cronograma cuja data é hoje. |
 
 Detalhes: [Scripts e Registry](docs/scripts-and-registry.md).
