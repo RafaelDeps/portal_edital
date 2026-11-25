@@ -1,8 +1,23 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeStatus, getEffectiveStatus } from '../../src/utils/status.js';
+import { isValidStatusInput, normalizeStatus, getEffectiveStatus } from '../../src/utils/status.js';
 
 describe('status normalization', () => {
+    test('validates known status inputs and rejects unknown values', () => {
+        assert.equal(isValidStatusInput(''), true);
+        assert.equal(isValidStatusInput('   '), true);
+        assert.equal(isValidStatusInput('aberto'), true);
+        assert.equal(isValidStatusInput('Abertas'), true);
+        assert.equal(isValidStatusInput('fechado'), true);
+        assert.equal(isValidStatusInput('suspensa'), true);
+        assert.equal(isValidStatusInput('resultado'), true);
+        assert.equal(isValidStatusInput('indefinido'), true);
+        assert.equal(isValidStatusInput('xyz'), false);
+        assert.equal(isValidStatusInput('em andamento'), false);
+        assert.equal(isValidStatusInput(null), false);
+        assert.equal(isValidStatusInput(123), false);
+    });
+
     test('does not fall back to aberto when status is blank or unknown', () => {
         assert.equal(normalizeStatus(''), 'indefinido');
         assert.equal(normalizeStatus(null), 'indefinido');

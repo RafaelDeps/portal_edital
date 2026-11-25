@@ -35,6 +35,19 @@ function normalizeText(value) {
         .toLowerCase();
 }
 
+export function isValidStatusInput(value) {
+    if (typeof value !== 'string') {
+        return false;
+    }
+
+    const normalizedValue = normalizeText(value);
+    if (!normalizedValue) {
+        return true;
+    }
+
+    return STATUS_ALIASES.has(normalizedValue);
+}
+
 export function normalizeStatus(value) {
     if (typeof value !== 'string') {
         return 'indefinido';
