@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'fs';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { loadEnv } from './load-env.js';
@@ -7,6 +7,13 @@ import { normalizeStatus } from '../src/utils/status.js';
 import { run as syncCategories } from './sync-categories.js';
 import { PORTAL_URL } from './config.js';
 import { escapeHtml, getOrCreateTopicId, sendMessage, sleep } from './telegram.js';
+import {
+    getEditalKey,
+    isAnnounced,
+    loadRegistry,
+    migrateRegistry,
+    saveRegistry,
+} from './registry.js';
 
 loadEnv();
 
@@ -14,23 +21,14 @@ const DEFAULT_DATA_DIR = 'data';
 const DEFAULT_REGISTRY_FILE = join('registry', 'downloads_registry.json');
 export const DEFAULT_MAX_INDIVIDUAL = Number(process.env.TELEGRAM_MAX_INDIVIDUAL || 10);
 
-function getRegistry(registryPath) {
-    if (existsSync(registryPath)) {
-        try {
-            return JSON.parse(readFileSync(registryPath, 'utf-8'));
-        } catch (e) {
-            console.error(`❌ Error reading registry: ${e.message}`);
-            return {};
-        }
-    }
-    return {};
-}
-
-function buildRegistryEntry(content, category, now) {
+function buildRegistryEntry(existingEntry, content, category, now) {
     return {
-        data_entrada: now,
+        ...(existingEntry || {}),
+        data_entrada: existingEntry?.data_entrada || now,
         categoria: category,
         cronograma: content.cronograma || [],
+        anunciado: true,
+        notificacoes_enviadas: existingEntry?.notificacoes_enviadas || [],
     };
 }
 
@@ -56,14 +54,12 @@ export function buildSummaryMessage(items) {
 export async function run(
     dataDir = DEFAULT_DATA_DIR,
     registryFile = DEFAULT_REGISTRY_FILE,
-    {
-        seed = false,
-        maxIndividual = DEFAULT_MAX_INDIVIDUAL,
-        delayMs = 2000,
-    } = {}
+    { seed = false, maxIndividual = DEFAULT_MAX_INDIVIDUAL, delayMs = 2000 } = {}
 ) {
     syncCategories(dataDir);
-    const registry = getRegistry(registryFile);
+    const registry = loadRegistry(registryFile);
+    let registryChanged = migrateRegistry(registry, dataDir);
+
     const files = existsSync(dataDir)
         ? readdirSync(dataDir).filter(
               (file) =>
@@ -73,30 +69,34 @@ export async function run(
           )
         : [];
     const now = new Date().toISOString();
-    let registryChanged = false;
 
     const pendingEligible = [];
     const pendingClosed = [];
+    const seenKeys = new Set();
 
     for (const file of files) {
-        if (registry[file]) continue;
-
         const filePath = join(dataDir, file);
         try {
             const content = JSON.parse(readFileSync(filePath, 'utf-8'));
+            const key = getEditalKey(content, file);
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
+
+            if (isAnnounced(registry[key])) continue;
+
             const category = normalizeCategory(content.categoria);
             const status = normalizeStatus(content.status);
 
             if (seed) {
-                registry[file] = buildRegistryEntry(content, category, now);
+                registry[key] = buildRegistryEntry(registry[key], content, category, now);
                 registryChanged = true;
                 continue;
             }
 
             if (status === 'encerrado') {
-                pendingClosed.push({ file, content, category });
+                pendingClosed.push({ file, key, content, category });
             } else {
-                pendingEligible.push({ file, content, category });
+                pendingEligible.push({ file, key, content, category });
             }
         } catch (err) {
             console.error(`❌ Error processing ${file}: ${err.message}`);
@@ -105,7 +105,7 @@ export async function run(
 
     if (seed) {
         if (registryChanged) {
-            writeFileSync(registryFile, JSON.stringify(registry, null, 4));
+            saveRegistry(registryFile, registry);
             console.log(`🌱 Seed concluído: registro atualizado sem envio de mensagens.`);
         } else {
             console.log('🌱 Seed concluído: nenhum arquivo novo para registrar.');
@@ -113,9 +113,9 @@ export async function run(
         return;
     }
 
-    for (const { file, content, category } of pendingClosed) {
+    for (const { file, key, content, category } of pendingClosed) {
         console.log(`⏭️ Ignorando anúncio de edital encerrado: ${file}`);
-        registry[file] = buildRegistryEntry(content, category, now);
+        registry[key] = buildRegistryEntry(registry[key], content, category, now);
         registryChanged = true;
     }
 
@@ -129,15 +129,15 @@ export async function run(
         });
 
         if (success) {
-            for (const { file, content, category } of pendingEligible) {
-                registry[file] = buildRegistryEntry(content, category, now);
+            for (const { key, content, category } of pendingEligible) {
+                registry[key] = buildRegistryEntry(registry[key], content, category, now);
             }
             registryChanged = true;
         } else {
             console.warn('🛑 Skipping registry update for batch due to summary send failure.');
         }
     } else {
-        for (const { file, content, category } of pendingEligible) {
+        for (const { file, key, content, category } of pendingEligible) {
             console.log(`🆕 New edital detected: ${file}`);
             const title = content.nome || file;
             const link = content.link || '';
@@ -167,7 +167,7 @@ export async function run(
             const success = await sendMessage(message, topicId);
 
             if (success) {
-                registry[file] = buildRegistryEntry(content, category, now);
+                registry[key] = buildRegistryEntry(registry[key], content, category, now);
                 registryChanged = true;
                 if (delayMs > 0) {
                     await sleep(delayMs);
@@ -179,7 +179,7 @@ export async function run(
     }
 
     if (registryChanged) {
-        writeFileSync(registryFile, JSON.stringify(registry, null, 4));
+        saveRegistry(registryFile, registry);
         console.log('💾 Registry updated.');
     } else {
         console.log('✨ No new editals found.');

@@ -1,6 +1,6 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { run } from '../../scripts/schedule-reminders.js';
@@ -18,24 +18,18 @@ describe('schedule-reminders.js Unit Tests', () => {
         dataDir = join(tempDir, 'data');
         const registryDir = join(tempDir, 'registry');
         registryFile = join(registryDir, 'downloads_registry.json');
-        
+
         mkdirSync(dataDir);
         mkdirSync(registryDir);
 
-        // Mock fetch globally
         global.fetch = async (url) => {
             if (url.includes('createForumTopic')) {
                 return {
                     ok: true,
                     json: async () => ({ ok: true, result: { message_thread_id: 123 } }),
-                    text: async () => JSON.stringify({ ok: true, result: { message_thread_id: 123 } })
                 };
             }
-            return { 
-                ok: true, 
-                text: async () => 'ok',
-                json: async () => ({ ok: true })
-            };
+            return { ok: true, json: async () => ({ ok: true }) };
         };
     });
 
@@ -44,86 +38,79 @@ describe('schedule-reminders.js Unit Tests', () => {
     });
 
     test('Should trigger reminder for today event', async () => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = '2026-11-25';
         const testEdital = {
-            nome: "Edital Hoje",
-            cronograma: [{ evento: "Evento de Hoje", data: today }]
+            nome: 'Edital Hoje',
+            link: 'https://example.com/hoje',
+            cronograma: [{ evento: 'Evento de Hoje', data: today }],
         };
-        
+
         writeFileSync(join(dataDir, 'hoje.json'), JSON.stringify(testEdital));
-        
+
         let fetchMessage = '';
         global.fetch = async (url, options) => {
             if (url.includes('createForumTopic')) {
-                return {
-                    ok: true,
-                    json: async () => ({ ok: true, result: { message_thread_id: 123 } })
-                };
+                return { ok: true, json: async () => ({ ok: true, result: { message_thread_id: 123 } }) };
             }
-            const body = JSON.parse(options.body);
-            fetchMessage = body.text;
-            return { 
-                ok: true, 
-                text: async () => 'ok',
-                json: async () => ({ ok: true })
-            };
+            fetchMessage = JSON.parse(options.body).text;
+            return { ok: true, json: async () => ({ ok: true }) };
         };
 
-        await run(dataDir, registryFile);
-        
-        assert.ok(fetchMessage.includes('Lembrete de Cronograma'), 'Should send reminder message');
-        assert.ok(fetchMessage.includes('Evento de Hoje'), 'Message should contain event name');
-        
+        await run(dataDir, registryFile, { today, delayMs: 0 });
+
+        assert.ok(fetchMessage.includes('Lembrete de Cronograma'));
+        assert.ok(fetchMessage.includes('Evento de Hoje'));
+
         const registry = JSON.parse(readFileSync(registryFile, 'utf-8'));
-        assert.ok(registry['hoje.json'].notificacoes_enviadas.includes(`Evento de Hoje_${today}`), 'Should record sent notification');
+        assert.ok(
+            registry['https://example.com/hoje'].notificacoes_enviadas.includes(`Evento de Hoje_${today}`)
+        );
+        assert.strictEqual(registry._meta.last_reminders_run, today);
     });
 
     test('Should not double notify for the same event', async () => {
-        const today = new Date().toISOString().split('T')[0];
+        const today = '2026-11-25';
         const eventKey = `Evento Repetido_${today}`;
-        
-        const initialRegistry = {
-            'repetido.json': {
-                notificacoes_enviadas: [eventKey]
-            }
-        };
-        writeFileSync(registryFile, JSON.stringify(initialRegistry));
-        
-        const testEdital = {
-            nome: "Edital Repetido",
-            cronograma: [{ evento: "Evento Repetido", data: today }]
-        };
-        writeFileSync(join(dataDir, 'repetido.json'), JSON.stringify(testEdital));
-        
+
+        writeFileSync(
+            registryFile,
+            JSON.stringify({
+                'https://example.com/repetido': {
+                    anunciado: true,
+                    notificacoes_enviadas: [eventKey],
+                },
+            })
+        );
+
+        writeFileSync(
+            join(dataDir, 'repetido.json'),
+            JSON.stringify({
+                nome: 'Edital Repetido',
+                link: 'https://example.com/repetido',
+                cronograma: [{ evento: 'Evento Repetido', data: today }],
+            })
+        );
+
         let fetchCalls = 0;
         global.fetch = async (url) => {
-            if (url.includes('createForumTopic')) {
-                return {
-                    ok: true,
-                    json: async () => ({ ok: true, result: { message_thread_id: 123 } })
-                };
-            }
-            fetchCalls++;
-            return { 
-                ok: true, 
-                text: async () => 'ok',
-                json: async () => ({ ok: true })
-            };
+            if (url.includes('sendMessage')) fetchCalls++;
+            return { ok: true, json: async () => ({ ok: true }) };
         };
 
-        await run(dataDir, registryFile);
-        
-        assert.strictEqual(fetchCalls, 0, 'Should not send notification if already recorded in registry');
+        await run(dataDir, registryFile, { today, delayMs: 0 });
+        assert.strictEqual(fetchCalls, 0);
     });
 
     test('Should escape HTML special characters in reminder payload', async () => {
-        const today = new Date().toISOString().split('T')[0];
-        const testEdital = {
-            nome: 'Edital R&I <teste>',
-            link: 'https://example.com/doc?a=1&b=2',
-            cronograma: [{ evento: 'Submissão <final> & revisão', data: today }],
-        };
-        writeFileSync(join(dataDir, 'escape_reminder.json'), JSON.stringify(testEdital));
+        const today = '2026-11-25';
+        writeFileSync(
+            join(dataDir, 'escape_reminder.json'),
+            JSON.stringify({
+                nome: 'Edital R&I <teste>',
+                link: 'https://example.com/doc?a=1&b=2',
+                cronograma: [{ evento: 'Submissão <final> & revisão', data: today }],
+            })
+        );
 
         let sentText = '';
         global.fetch = async (url, options) => {
@@ -134,10 +121,78 @@ describe('schedule-reminders.js Unit Tests', () => {
             return { ok: true, json: async () => ({ ok: true }) };
         };
 
-        await run(dataDir, registryFile);
+        await run(dataDir, registryFile, { today, delayMs: 0 });
 
         assert.ok(sentText.includes('Edital R&amp;I &lt;teste&gt;'));
         assert.ok(sentText.includes('Submissão &lt;final&gt; &amp; revisão'));
         assert.ok(sentText.includes('href="https://example.com/doc?a=1&amp;b=2"'));
+    });
+
+    test('Should recover missed reminders when job did not run for 2 days without duplicating', async () => {
+        writeFileSync(
+            registryFile,
+            JSON.stringify({
+                _meta: { last_reminders_run: '2026-11-22' },
+            })
+        );
+
+        writeFileSync(
+            join(dataDir, 'recuperacao.json'),
+            JSON.stringify({
+                nome: 'Edital Recuperação',
+                link: 'https://example.com/rec',
+                cronograma: [
+                    { evento: 'Evento Dia 23', data: '2026-11-23' },
+                    { evento: 'Evento Dia 24', data: '2026-11-24' },
+                    { evento: 'Evento Dia 25', data: '2026-11-25' },
+                    { evento: 'Evento Futuro', data: '2026-11-26' },
+                ],
+            })
+        );
+
+        const sent = [];
+        global.fetch = async (url, options) => {
+            if (url.includes('sendMessage')) {
+                sent.push(JSON.parse(options.body).text);
+            }
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile, { today: '2026-11-25', delayMs: 0 });
+        assert.strictEqual(sent.length, 3);
+        assert.ok(sent[0].includes('Evento Dia 23'));
+        assert.ok(sent[1].includes('Evento Dia 24'));
+        assert.ok(sent[2].includes('Evento Dia 25'));
+
+        await run(dataDir, registryFile, { today: '2026-11-25', delayMs: 0 });
+        assert.strictEqual(sent.length, 3, 'Must not resend recovered reminders');
+    });
+
+    test('Should ignore invalid item.data without breaking other events in the same edital', async () => {
+        const today = '2026-11-25';
+        writeFileSync(
+            join(dataDir, 'data_invalida.json'),
+            JSON.stringify({
+                nome: 'Edital Com Evento Inválido',
+                link: 'https://example.com/invalido',
+                cronograma: [
+                    { evento: 'Evento Quebrado', data: null },
+                    { evento: 'Evento Número', data: 12345 },
+                    { evento: 'Evento Válido', data: `A partir de ${today}` },
+                ],
+            })
+        );
+
+        const sent = [];
+        global.fetch = async (url, options) => {
+            if (url.includes('sendMessage')) {
+                sent.push(JSON.parse(options.body).text);
+            }
+            return { ok: true, json: async () => ({ ok: true }) };
+        };
+
+        await run(dataDir, registryFile, { today, delayMs: 0 });
+        assert.strictEqual(sent.length, 1);
+        assert.ok(sent[0].includes('Evento Válido'));
     });
 });
