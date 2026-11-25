@@ -93,6 +93,44 @@ export function validateEditalObject(data, fileName = '<memory>') {
         }
     }
 
+    if (data.chamadas !== undefined) {
+        if (!Array.isArray(data.chamadas)) {
+            addError('chamadas', 'Campo opcional chamadas deve ser um array.');
+        } else {
+            data.chamadas.forEach((item, index) => {
+                if (!isPlainObject(item)) {
+                    addError(`chamadas[${index}]`, 'Cada item de chamadas deve ser um objeto.');
+                    return;
+                }
+                if (typeof item.nome !== 'string') {
+                    addError(`chamadas[${index}].nome`, 'Campo nome da chamada deve ser uma string.');
+                }
+                if (typeof item.abertura !== 'string') {
+                    addError(`chamadas[${index}].abertura`, 'Campo abertura da chamada deve ser uma string.');
+                }
+                if (typeof item.encerramento !== 'string') {
+                    addError(
+                        `chamadas[${index}].encerramento`,
+                        'Campo encerramento da chamada deve ser uma string.'
+                    );
+                }
+            });
+        }
+    }
+
+    if (data.proxima_etapa !== undefined && data.proxima_etapa !== null) {
+        if (!isPlainObject(data.proxima_etapa)) {
+            addError('proxima_etapa', 'Campo opcional proxima_etapa deve ser um objeto ou null.');
+        } else {
+            if (typeof data.proxima_etapa.evento !== 'string') {
+                addError('proxima_etapa.evento', 'Campo evento de proxima_etapa deve ser uma string.');
+            }
+            if (typeof data.proxima_etapa.data !== 'string') {
+                addError('proxima_etapa.data', 'Campo data de proxima_etapa deve ser uma string.');
+            }
+        }
+    }
+
     return errors;
 }
 

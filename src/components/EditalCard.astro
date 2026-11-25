@@ -1,6 +1,7 @@
 ---
 import type { CollectionEntry } from "astro:content";
 import { getCategoryLabel } from "../utils/category.js";
+import { formatProximaEtapa, formatShortDate } from "../utils/chamadas.js";
 
 interface Props {
     edital: CollectionEntry<"editais">;
@@ -9,6 +10,7 @@ interface Props {
 const { edital } = Astro.props;
 const { data, id } = edital;
 const categoryLabel = getCategoryLabel(data.categoria);
+const proximaEtapa = formatProximaEtapa(data.proxima_etapa);
 
 const statusColors: Record<string, string> = {
     aberto: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
@@ -82,9 +84,29 @@ const statusColors: Record<string, string> = {
             <span class="text-primary-400">Encerramento</span>
             <span class="text-cta-600 font-bold"
                 >{data.data_encerramento
-                    ? new Date(data.data_encerramento).toLocaleDateString("pt-BR")
+                    ? formatShortDate(data.data_encerramento)
                     : "—"}</span
             >
         </div>
+        {
+            proximaEtapa && (
+                <div
+                    class="flex items-start justify-between gap-2 pt-2 border-t border-primary-100/70 dark:border-white/5 text-[11px]"
+                    data-testid="edital-proxima-etapa"
+                >
+                    <span class="font-medium uppercase tracking-tight text-primary-400 shrink-0">
+                        Próxima etapa
+                    </span>
+                    <span class="text-right font-semibold text-primary-700 dark:text-primary-200 leading-snug">
+                        {proximaEtapa.evento}
+                        {proximaEtapa.dataFormatada && (
+                            <span class="text-cta-600 dark:text-cta-400 font-bold">
+                                {" "}({proximaEtapa.dataFormatada})
+                            </span>
+                        )}
+                    </span>
+                </div>
+            )
+        }
     </div>
 </article>

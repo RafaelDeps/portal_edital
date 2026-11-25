@@ -165,6 +165,36 @@ describe('validate-data.js schema validation', () => {
         assert.equal(result.valid, true, JSON.stringify(result.errors, null, 2));
         assert.ok(result.checkedFiles > 0);
     });
+
+    test('accepts optional chamadas and proxima_etapa and rejects malformed ones', () => {
+        const withNewFields = makeValidEdital({
+            chamadas: [
+                { nome: '1ª chamada', abertura: '2026-01-10', encerramento: '2026-03-10' },
+                { nome: '2ª chamada', abertura: '2026-11-01', encerramento: '2026-12-15' },
+            ],
+            proxima_etapa: { evento: 'Encerramento da 2ª chamada', data: '2026-12-15' },
+        });
+        assert.deepEqual(validateEditalObject(withNewFields, 'new.json'), []);
+
+        const withNullNextStep = makeValidEdital({ chamadas: [], proxima_etapa: null });
+        assert.deepEqual(validateEditalObject(withNullNextStep, 'null-next.json'), []);
+
+        const malformed = makeValidEdital({
+            chamadas: [{ nome: 123, abertura: null, encerramento: '2026-12-15' }, 'invalido'],
+            proxima_etapa: { evento: 42, data: null },
+        });
+        const errors = validateEditalObject(malformed, 'malformed-new.json');
+        assert.deepEqual(
+            errors.map((e) => `${e.file}:${e.field}`),
+            [
+                'malformed-new.json:chamadas[0].nome',
+                'malformed-new.json:chamadas[0].abertura',
+                'malformed-new.json:chamadas[1]',
+                'malformed-new.json:proxima_etapa.evento',
+                'malformed-new.json:proxima_etapa.data',
+            ]
+        );
+    });
 });
 
 describe('daily-sync-deploy.yml workflow order and naming', () => {

@@ -18,6 +18,15 @@ const editais = defineCollection({
       evento: z.string(),
       data: z.string()
     })).optional().default([]),
+    chamadas: z.array(z.object({
+      nome: z.string(),
+      abertura: z.string().or(z.literal("")),
+      encerramento: z.string().or(z.literal("")),
+    })).optional().default([]),
+    proxima_etapa: z.object({
+      evento: z.string(),
+      data: z.string(),
+    }).nullable().optional().default(null),
     tags: z.array(z.string()).optional(),
   }).transform((data) => ({
     ...data,
