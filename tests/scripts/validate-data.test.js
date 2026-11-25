@@ -201,3 +201,32 @@ describe('daily-sync-deploy.yml workflow order and naming', () => {
         assert.match(workflow, /- name: Validate data schema\s+run: node scripts\/validate-data\.js/);
     });
 });
+
+describe('repository hygiene, package name and workflow concurrency/actions v5', () => {
+    test('package.json and package-lock.json use portal_edital as package name', () => {
+        const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
+        const lock = JSON.parse(readFileSync('package-lock.json', 'utf-8'));
+
+        assert.equal(pkg.name, 'portal_edital');
+        assert.equal(lock.name, 'portal_edital');
+        assert.equal(lock.packages[''].name, 'portal_edital');
+    });
+
+    test('deploy.yml and daily-sync-deploy.yml configure pages concurrency and Actions v5', () => {
+        for (const workflowPath of [
+            '.github/workflows/deploy.yml',
+            '.github/workflows/daily-sync-deploy.yml',
+        ]) {
+            const content = readFileSync(workflowPath, 'utf-8');
+            assert.match(
+                content,
+                /concurrency:\s*\n\s+group:\s*"?pages"?\s*\n\s+cancel-in-progress:\s*false/,
+                `${workflowPath} should define concurrency group pages with cancel-in-progress: false`
+            );
+            assert.ok(content.includes('actions/checkout@v5'), `${workflowPath} should use actions/checkout@v5`);
+            assert.ok(content.includes('actions/setup-node@v5'), `${workflowPath} should use actions/setup-node@v5`);
+            assert.equal(content.includes('actions/checkout@v4'), false, `${workflowPath} should not use checkout@v4`);
+            assert.equal(content.includes('actions/setup-node@v4'), false, `${workflowPath} should not use setup-node@v4`);
+        }
+    });
+});
