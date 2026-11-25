@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { loadEnv } from './load-env.js';
 import { normalizeCategory } from '../src/utils/category.js';
 import { run as syncCategories } from './sync-categories.js';
+import { PORTAL_URL } from './config.js';
 
 loadEnv();
 
@@ -13,7 +14,6 @@ const __dirname = dirname(__filename);
 const DEFAULT_DATA_DIR = 'data';
 const DEFAULT_REGISTRY_FILE = join('registry', 'downloads_registry.json');
 const TOPICS_REGISTRY = join('registry', 'topics_registry.json');
-const PORTAL_URL = 'https://ifesserra-lab.github.io/portal_edital';
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 

@@ -25,7 +25,7 @@ jobs:
 
       - name: Sync data from retrieve_edital
         run: |
-          git clone --depth 1 https://github.com/ifesserra-lab/retrieve_edital.git temp_data
+          git clone --depth 1 https://github.com/RafaelDeps/retrieve_edital.git temp_data
           cp -r temp_data/data/output/*.json data/
           rm -rf temp_data
 
