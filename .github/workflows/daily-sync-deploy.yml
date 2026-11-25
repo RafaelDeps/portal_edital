@@ -23,17 +23,14 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync data from retrieve_edital
-        run: |
-          git clone --depth 1 https://github.com/RafaelDeps/retrieve_edital.git temp_data
-          cp -r temp_data/data/output/*.json data/
-          rm -rf temp_data
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
+
+      - name: Sync data from retrieve_edital
+        run: node scripts/sync-data.js
 
       - name: Install dependencies
         run: npm install
@@ -53,7 +50,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/*.json registry/
+          git add data/ registry/
           if git diff --staged --quiet; then
             echo "No changes in data to commit"
           else
