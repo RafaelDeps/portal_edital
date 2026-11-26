@@ -5,6 +5,10 @@ import Footer from "../../components/Footer.astro";
 import { getCollection } from "astro:content";
 
 const editais = await getCollection("editais");
+const ativosCount = editais.filter(
+  (e) => e.data.status === "aberto" || e.data.status === "fechando"
+).length;
+const encerradosCount = editais.filter((e) => e.data.status === "encerrado").length;
 const base = import.meta.env.BASE_URL;
 const zipUrl = `${base}dados-editais.zip`;
 ---
@@ -31,7 +35,7 @@ const zipUrl = `${base}dados-editais.zip`;
           Download dos <span class="text-transparent bg-clip-text bg-gradient-to-r from-cta-500 to-blue-400">dados</span>
         </h1>
         <p class="text-lg text-primary-600 dark:text-primary-300 font-medium mb-10">
-          Um único arquivo com todos os editais em JSON, atualizado a cada publicação do site.
+          Um único arquivo com todos os editais em JSON (ativos, recentes e histórico completo de encerrados/arquivados), atualizado a cada publicação do site.
         </p>
 
         <a
@@ -45,7 +49,7 @@ const zipUrl = `${base}dados-editais.zip`;
           Baixar todos os dados (ZIP)
         </a>
         <p class="text-sm text-primary-500 dark:text-primary-400 mt-4">
-          {editais.length} editais em JSON dentro do ZIP
+          {editais.length} editais em JSON dentro do ZIP ({ativosCount} abertos/fechando e {encerradosCount} encerrados/arquivados)
         </p>
       </section>
 
