@@ -37,6 +37,29 @@ export function validateIndicacao(input = {}) {
     };
 }
 
+export function buildIndicacaoBody(input = {}) {
+    const link = typeof input.link_oficial === 'string' ? input.link_oficial.trim() : '';
+    const orgao = typeof input.orgao === 'string' ? input.orgao.trim() : '';
+    const prazo = typeof input.prazo === 'string' ? input.prazo.trim() : '';
+    const observacoes = typeof input.observacoes === 'string' ? input.observacoes.trim() : '';
+
+    const sections = [];
+    if (link) {
+        sections.push(`### Link oficial do edital\n${link}`);
+    }
+    if (orgao) {
+        sections.push(`### Órgão de fomento / Instituição\n${orgao}`);
+    }
+    if (prazo) {
+        sections.push(`### Prazo de encerramento\n${prazo}`);
+    }
+    if (observacoes) {
+        sections.push(`### Observações\n${observacoes}`);
+    }
+
+    return sections.join('\n\n');
+}
+
 export function buildIndicarEditalUrl(input = {}, baseUrl = DEFAULT_REPO_ISSUES_URL) {
     const link = typeof input.link_oficial === 'string' ? input.link_oficial.trim() : '';
     const orgao = typeof input.orgao === 'string' ? input.orgao.trim() : '';
@@ -60,6 +83,10 @@ export function buildIndicarEditalUrl(input = {}, baseUrl = DEFAULT_REPO_ISSUES_
     }
     if (observacoes) {
         params.set('observacoes', observacoes);
+    }
+    const body = buildIndicacaoBody({ link_oficial: link, orgao, prazo, observacoes });
+    if (body) {
+        params.set('body', body);
     }
 
     return `${baseUrl}?${params.toString()}`;
