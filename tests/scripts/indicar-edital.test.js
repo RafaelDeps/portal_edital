@@ -62,6 +62,12 @@ describe('indicarEdital.js helper', () => {
         assert.equal(parsed.searchParams.get('prazo'), '15/12/2026');
         assert.equal(parsed.searchParams.get('observacoes'), 'Área: pesquisa & inovação');
 
+        const body = parsed.searchParams.get('body') || '';
+        assert.ok(body.includes('https://fapes.es.gov.br/edital?id=10&ano=2026'));
+        assert.ok(body.includes('FAPES / ES'));
+        assert.ok(body.includes('15/12/2026'));
+        assert.ok(body.includes('Área: pesquisa & inovação'));
+
         const minimalUrl = buildIndicarEditalUrl({
             link_oficial: 'https://cnpq.br/chamada-1',
             orgao: 'CNPq',
@@ -71,6 +77,11 @@ describe('indicarEdital.js helper', () => {
         const parsedMinimal = new URL(minimalUrl);
         assert.equal(parsedMinimal.searchParams.has('prazo'), false);
         assert.equal(parsedMinimal.searchParams.has('observacoes'), false);
+        const minimalBody = parsedMinimal.searchParams.get('body') || '';
+        assert.ok(minimalBody.includes('https://cnpq.br/chamada-1'));
+        assert.ok(minimalBody.includes('CNPq'));
+        assert.equal(minimalBody.includes('Prazo'), false);
+        assert.equal(minimalBody.includes('Observações'), false);
     });
 });
 
