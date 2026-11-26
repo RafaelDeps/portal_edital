@@ -1,0 +1,401 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import { getCollection } from "astro:content";
+import { getCategoryLabel } from "../../utils/category.js";
+import { formatShortDate } from "../../utils/chamadas.js";
+
+const allEditais = await getCollection("editais");
+const openEditais = allEditais
+    .filter((e) => e.data.status === "aberto" || e.data.status === "fechando")
+    .map((e) => ({
+        id: e.id,
+        url: `${import.meta.env.BASE_URL}/editais/${e.id}/`,
+        nome: e.data.nome,
+        descrição: e.data.descrição,
+        orgão_fomento: e.data.orgão_fomento,
+        categoria: e.data.categoria,
+        categoriaLabel: getCategoryLabel(e.data.categoria),
+        status: e.data.status,
+        data_encerramento: e.data.data_encerramento || "",
+        encerramentoFormatado: e.data.data_encerramento
+            ? formatShortDate(e.data.data_encerramento)
+            : "—",
+        tags: e.data.tags ?? [],
+        elegibilidade: e.data.elegibilidade ?? null,
+    }));
+---
+
+<BaseLayout
+    title="Compatibilidade com Currículo Lattes — Portal de Editais"
+    description="Compare seu Currículo Lattes (XML) ou suas áreas de pesquisa com os editais abertos, 100% no navegador e sem enviar dados pessoais."
+>
+    <Header />
+    <main id="main-content" class="flex-grow py-8 sm:py-16" tabindex="-1">
+        <div class="container max-w-5xl mx-auto px-4">
+            <section class="mb-10">
+                <div
+                    class="inline-flex items-center space-x-2 bg-cta-500/10 border border-cta-500/20 rounded-full px-4 py-1.5 mb-6"
+                >
+                    <span class="flex h-2 w-2 rounded-full bg-cta-500"></span>
+                    <span class="text-xs font-bold text-cta-500 uppercase tracking-widest">
+                        Recomendação Inteligente
+                    </span>
+                </div>
+                <h1 class="text-4xl sm:text-5xl font-black text-primary-900 dark:text-white mb-4 leading-tight">
+                    Editais <span class="text-transparent bg-clip-text bg-gradient-to-r from-cta-500 to-blue-400">compatíveis</span> com seu perfil
+                </h1>
+                <p class="text-lg text-primary-600 dark:text-primary-300 max-w-3xl">
+                    Descubra quais dos <strong>{openEditais.length} editais abertos ou fechando</strong> mais combinam com sua área de atuação e titulação usando o XML do seu Currículo Lattes ou o modo rápido manual.
+                </p>
+            </section>
+
+            <div
+                data-testid="compatibilidade-lgpd"
+                class="mb-10 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-sm text-primary-900 dark:text-emerald-100"
+            >
+                <strong>Privacidade garantida (LGPD):</strong> o arquivo XML do seu Currículo Lattes é lido <strong>100% no seu navegador</strong>. Nenhum dado pessoal (nome, CPF, e-mail) é extraído, salvo ou enviado para qualquer servidor.
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+                <!-- Modo 1: Upload XML Lattes -->
+                <section class="glass p-6 sm:p-8 rounded-2xl border border-primary-200 dark:border-white/10 space-y-4">
+                    <h2 class="text-xl font-bold text-primary-900 dark:text-white">
+                        1. Enviar XML do Currículo Lattes
+                    </h2>
+                    <p class="text-sm text-primary-600 dark:text-primary-400">
+                        No portal do CNPq (Lattes), clique em <strong>Exportar → XML</strong>, extraia o arquivo <code class="px-1 py-0.5 rounded bg-primary-100 dark:bg-primary-800 font-mono text-xs">.xml</code> do ZIP baixado e selecione-o abaixo.
+                    </p>
+                    <div>
+                        <label
+                            for="lattes-file-input"
+                            class="block text-sm font-semibold text-primary-900 dark:text-white mb-2"
+                        >
+                            Arquivo XML do Lattes (máx. 20 MB)
+                        </label>
+                        <input
+                            id="lattes-file-input"
+                            type="file"
+                            accept=".xml,text/xml,application/xml"
+                            data-testid="lattes-file-input"
+                            class="block w-full text-sm text-primary-700 dark:text-primary-200 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-cta-600 file:text-white hover:file:bg-cta-700 file:cursor-pointer cursor-pointer rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                        />
+                    </div>
+                </section>
+
+                <!-- Modo 2: Modo rápido manual -->
+                <section class="glass p-6 sm:p-8 rounded-2xl border border-primary-200 dark:border-white/10">
+                    <h2 class="text-xl font-bold text-primary-900 dark:text-white mb-4">
+                        2. Modo rápido manual
+                    </h2>
+                    <form id="manual-form" data-testid="manual-form" class="space-y-4" novalidate>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label
+                                    for="manual-titulacao"
+                                    class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+                                >
+                                    Titulação
+                                </label>
+                                <select
+                                    id="manual-titulacao"
+                                    data-testid="manual-titulacao"
+                                    class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-primary-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                                >
+                                    <option value="">Qualquer / não informar</option>
+                                    <option value="ensino_medio">Ensino Médio</option>
+                                    <option value="graduacao">Graduação</option>
+                                    <option value="especializacao">Especialização</option>
+                                    <option value="mestrado">Mestrado</option>
+                                    <option value="doutorado">Doutorado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label
+                                    for="manual-publico"
+                                    class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+                                >
+                                    Perfil / Público (opcional)
+                                </label>
+                                <select
+                                    id="manual-publico"
+                                    data-testid="manual-publico"
+                                    class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-primary-900 dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                                >
+                                    <option value="">Não informar</option>
+                                    <option value="pesquisador">Pesquisador</option>
+                                    <option value="docente">Docente</option>
+                                    <option value="pos_graduando">Pós-graduando</option>
+                                    <option value="estudante_graduacao">Estudante de graduação</option>
+                                    <option value="empresa">Empresa / Startup</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label
+                                for="manual-termos"
+                                class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+                            >
+                                Áreas de atuação ou palavras-chave
+                            </label>
+                            <input
+                                id="manual-termos"
+                                type="text"
+                                data-testid="manual-termos"
+                                placeholder="Ex.: inteligência artificial, saúde, energias renováveis, bolsas"
+                                class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-sm text-primary-900 dark:text-white placeholder:text-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            data-testid="manual-submit"
+                            class="inline-flex items-center justify-center rounded-xl bg-cta-600 hover:bg-cta-700 text-white font-semibold text-sm px-6 py-2.5 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                        >
+                            Encontrar editais compatíveis
+                        </button>
+                    </form>
+                </section>
+            </div>
+
+            <div
+                id="compatibilidade-erro"
+                data-testid="compatibilidade-erro"
+                role="alert"
+                class="hidden mb-6 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-700 dark:text-red-300"
+            ></div>
+
+            <section
+                id="perfil-resumo"
+                data-testid="perfil-resumo"
+                aria-live="polite"
+                class="hidden mb-8 rounded-2xl border border-primary-200 dark:border-white/10 bg-white dark:bg-slate-900 p-5"
+            ></section>
+
+            <section
+                id="compatibilidade-resultados"
+                data-testid="compatibilidade-resultados"
+                aria-live="polite"
+                class="space-y-4"
+            ></section>
+
+            <div
+                id="compatibilidade-vazio"
+                data-testid="compatibilidade-vazio"
+                class="hidden rounded-2xl border border-primary-200 dark:border-white/10 bg-white dark:bg-slate-900 p-8 text-center space-y-3"
+            >
+                <p class="text-base font-semibold text-primary-900 dark:text-white">
+                    Nenhum edital aberto atingiu compatibilidade com os termos informados.
+                </p>
+                <p class="text-sm text-primary-600 dark:text-primary-400">
+                    Tente usar termos mais amplos (ex.: saúde, inovação, bolsas, engenharia) ou explore todos os{" "}
+                    <a
+                        href={import.meta.env.BASE_URL}
+                        class="font-semibold text-cta-600 dark:text-cta-400 underline hover:no-underline"
+                    >
+                        editais abertos na página inicial
+                    </a>.
+                </p>
+            </div>
+        </div>
+    </main>
+    <Footer />
+</BaseLayout>
+
+<script
+    id="open-editais-catalog"
+    type="application/json"
+    set:html={JSON.stringify(openEditais)}
+></script>
+
+<script>
+    import {
+        TITULACAO_LABELS,
+        buildManualProfile,
+        decodeXmlBytes,
+        parseLattesXml,
+        rankEditais,
+    } from "../../utils/lattesMatcher.js";
+
+    const MAX_FILE_BYTES = 20 * 1024 * 1024;
+    const catalogEl = document.getElementById("open-editais-catalog");
+    const openEditais = catalogEl ? JSON.parse(catalogEl.textContent || "[]") : [];
+
+    const fileInput = document.getElementById("lattes-file-input") as HTMLInputElement | null;
+    const manualForm = document.getElementById("manual-form") as HTMLFormElement | null;
+    const titulacaoInput = document.getElementById("manual-titulacao") as HTMLSelectElement | null;
+    const publicoInput = document.getElementById("manual-publico") as HTMLSelectElement | null;
+    const termosInput = document.getElementById("manual-termos") as HTMLInputElement | null;
+    const errorBox = document.getElementById("compatibilidade-erro");
+    const resumoBox = document.getElementById("perfil-resumo");
+    const resultsBox = document.getElementById("compatibilidade-resultados");
+    const emptyBox = document.getElementById("compatibilidade-vazio");
+
+    function showError(message: string) {
+        if (!errorBox) return;
+        errorBox.textContent = message;
+        errorBox.classList.remove("hidden");
+    }
+
+    function clearError() {
+        if (!errorBox) return;
+        errorBox.textContent = "";
+        errorBox.classList.add("hidden");
+    }
+
+    function renderProfileSummary(profile: {
+        source: string;
+        titulacao: string;
+        areas: string[];
+        palavrasChave: string[];
+    }) {
+        if (!resumoBox) return;
+        resumoBox.replaceChildren();
+
+        const title = document.createElement("h2");
+        title.className = "text-sm font-bold uppercase tracking-wider text-primary-900 dark:text-white mb-2";
+        title.textContent =
+            profile.source === "lattes_xml"
+                ? "Perfil extraído localmente do XML do Lattes"
+                : "Perfil informado manualmente";
+        resumoBox.appendChild(title);
+
+        const details = document.createElement("p");
+        details.className = "text-sm text-primary-600 dark:text-primary-300";
+        const parts: string[] = [];
+        if (profile.titulacao) {
+            const label =
+                TITULACAO_LABELS[profile.titulacao as keyof typeof TITULACAO_LABELS] ||
+                profile.titulacao;
+            parts.push(`Titulação: ${label}`);
+        }
+        if (profile.areas.length > 0) {
+            parts.push(`Áreas/termos (${profile.areas.length}): ${profile.areas.slice(0, 6).join(", ")}`);
+        }
+        details.textContent = parts.join(" · ") || "Nenhum termo identificado.";
+        resumoBox.appendChild(details);
+        resumoBox.classList.remove("hidden");
+    }
+
+    function renderResults(
+        matches: ReturnType<typeof rankEditais>
+    ) {
+        if (!resultsBox || !emptyBox) return;
+        resultsBox.replaceChildren();
+
+        if (matches.length === 0) {
+            emptyBox.classList.remove("hidden");
+            return;
+        }
+        emptyBox.classList.add("hidden");
+
+        const header = document.createElement("h2");
+        header.className = "text-xl font-bold text-primary-900 dark:text-white mb-2";
+        header.textContent = `${matches.length} ${
+            matches.length === 1 ? "edital compatível encontrado" : "editais compatíveis encontrados"
+        }`;
+        resultsBox.appendChild(header);
+
+        for (const match of matches) {
+            const card = document.createElement("article");
+            card.setAttribute("data-testid", "compatibilidade-item");
+            card.className =
+                "rounded-2xl border border-primary-200 dark:border-white/10 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-3";
+
+            const top = document.createElement("div");
+            top.className = "flex flex-wrap items-center justify-between gap-2";
+
+            const badge = document.createElement("span");
+            const badgeColor =
+                match.nivel === "alta"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30"
+                    : match.nivel === "media"
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300 border-amber-300 dark:border-amber-500/30"
+                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700";
+            badge.className = `px-3 py-1 rounded-full text-xs font-bold border ${badgeColor}`;
+            badge.textContent = `Compatibilidade: ${match.score}%`;
+            top.appendChild(badge);
+
+            const meta = document.createElement("span");
+            meta.className = "text-xs font-semibold text-primary-500 dark:text-primary-400";
+            meta.textContent = `${match.edital.orgão_fomento || "Órgão não informado"} · Encerramento: ${match.edital.encerramentoFormatado}`;
+            top.appendChild(meta);
+            card.appendChild(top);
+
+            const h3 = document.createElement("h3");
+            h3.className = "text-lg font-bold text-primary-900 dark:text-white";
+            const link = document.createElement("a");
+            link.href = match.edital.url;
+            link.className = "hover:text-cta-600 dark:hover:text-cta-400 underline-offset-2 hover:underline";
+            link.textContent = match.edital.nome;
+            h3.appendChild(link);
+            card.appendChild(h3);
+
+            if (match.motivos.length > 0) {
+                const list = document.createElement("ul");
+                list.className = "space-y-1 text-sm text-primary-700 dark:text-primary-300";
+                for (const motivo of match.motivos) {
+                    const li = document.createElement("li");
+                    li.textContent = `• ${motivo}`;
+                    list.appendChild(li);
+                }
+                card.appendChild(list);
+            }
+
+            if (match.requisitosResumo) {
+                const req = document.createElement("p");
+                req.className = "text-xs text-primary-500 dark:text-primary-400";
+                req.textContent = `Requisitos: ${match.requisitosResumo}`;
+                card.appendChild(req);
+            }
+
+            resultsBox.appendChild(card);
+        }
+    }
+
+    fileInput?.addEventListener("change", async () => {
+        clearError();
+        const file = fileInput.files?.[0];
+        if (!file) return;
+
+        if (!file.name.toLowerCase().endsWith(".xml")) {
+            showError("Selecione um arquivo com extensão .xml (extraia o .xml caso tenha baixado um .zip do CNPq).");
+            return;
+        }
+        if (file.size > MAX_FILE_BYTES) {
+            showError("O arquivo excede o limite de 20 MB.");
+            return;
+        }
+
+        try {
+            const buffer = await file.arrayBuffer();
+            const xmlText = decodeXmlBytes(buffer);
+            const profile = parseLattesXml(xmlText);
+            renderProfileSummary(profile);
+            renderResults(rankEditais(profile, openEditais));
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro ao ler o arquivo XML.";
+            showError(msg);
+        }
+    });
+
+    manualForm?.addEventListener("submit", (event) => {
+        event.preventDefault();
+        clearError();
+        const termos = termosInput?.value?.trim() || "";
+        const titulacao = titulacaoInput?.value || "";
+        const publicoAlvo = publicoInput?.value || "";
+
+        if (!termos && !titulacao) {
+            showError("Informe ao menos uma área/palavra-chave ou selecione sua titulação.");
+            termosInput?.focus();
+            return;
+        }
+
+        const profile = buildManualProfile({ titulacao, publicoAlvo, termos });
+        renderProfileSummary(profile);
+        renderResults(rankEditais(profile, openEditais));
+    });
+</script>

@@ -195,6 +195,37 @@ describe('validate-data.js schema validation', () => {
             ]
         );
     });
+
+    test('accepts optional elegibilidade and rejects malformed subfields', () => {
+        const valid = makeValidEdital({
+            elegibilidade: {
+                titulacao_minima: 'doutorado',
+                publico_alvo: ['pesquisador', 'docente'],
+                areas_conhecimento: ['Ciência da Computação'],
+                requisitos_resumo: 'Vínculo com ICT.',
+            },
+        });
+        assert.deepEqual(validateEditalObject(valid, 'eleg-ok.json'), []);
+        assert.deepEqual(validateEditalObject(makeValidEdital({ elegibilidade: null }), 'eleg-null.json'), []);
+
+        const bad = makeValidEdital({
+            elegibilidade: {
+                titulacao_minima: 123,
+                publico_alvo: ['pesquisador', 42],
+                areas_conhecimento: 'nao-e-array',
+                requisitos_resumo: false,
+            },
+        });
+        assert.deepEqual(
+            validateEditalObject(bad, 'eleg-bad.json').map((e) => `${e.file}:${e.field}`),
+            [
+                'eleg-bad.json:elegibilidade.titulacao_minima',
+                'eleg-bad.json:elegibilidade.requisitos_resumo',
+                'eleg-bad.json:elegibilidade.publico_alvo[1]',
+                'eleg-bad.json:elegibilidade.areas_conhecimento',
+            ]
+        );
+    });
 });
 
 describe('daily-sync-deploy.yml workflow order and naming', () => {

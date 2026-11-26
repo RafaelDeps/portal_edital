@@ -27,6 +27,12 @@ const editais = defineCollection({
       evento: z.string(),
       data: z.string(),
     }).nullable().optional().default(null),
+    elegibilidade: z.object({
+      titulacao_minima: z.string().optional(),
+      publico_alvo: z.array(z.string()).optional(),
+      areas_conhecimento: z.array(z.string()).optional(),
+      requisitos_resumo: z.string().optional(),
+    }).nullable().optional().default(null),
     tags: z.array(z.string()).optional(),
   }).transform((data) => ({
     ...data,
