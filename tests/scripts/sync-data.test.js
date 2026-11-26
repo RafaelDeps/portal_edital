@@ -140,4 +140,128 @@ describe('sync-data.js Unit Tests', () => {
         await assert.doesNotReject(() => runNotify(targetDir, registryFile));
         await assert.doesNotReject(() => runReminders(targetDir, registryFile));
     });
+
+    test('preserva edital movido de data/output/ para data/arquivo/ com o mesmo slug e trata reabertura', () => {
+        const archiveDir = join(tempDir, 'archive');
+        mkdirSync(archiveDir);
+
+        writeFileSync(join(targetDir, 'edital_a.json'), JSON.stringify({ nome: 'Edital A', status: 'aberto' }));
+        writeFileSync(join(sourceDir, 'edital_b.json'), JSON.stringify({ nome: 'Edital B', status: 'aberto' }));
+        writeFileSync(
+            join(archiveDir, 'edital_a.json'),
+            JSON.stringify({ nome: 'Edital A', status: 'encerrado' })
+        );
+
+        const firstSync = syncData({ sourceDir, archiveDir, targetDir });
+        assert.strictEqual(firstSync.total, 2);
+        assert.strictEqual(firstSync.activeCount, 1);
+        assert.strictEqual(firstSync.archivedCount, 1);
+        assert.deepStrictEqual(firstSync.removed, []);
+        assert.deepStrictEqual(readdirSync(targetDir).sort(), ['edital_a.json', 'edital_b.json']);
+        assert.strictEqual(
+            JSON.parse(readFileSync(join(targetDir, 'edital_a.json'), 'utf-8')).status,
+            'encerrado'
+        );
+
+        // Reabertura: edital_a volta para sourceDir e sai de archiveDir
+        rmSync(join(archiveDir, 'edital_a.json'));
+        writeFileSync(
+            join(sourceDir, 'edital_a.json'),
+            JSON.stringify({ nome: 'Edital A', status: 'aberto' })
+        );
+
+        const reopenSync = syncData({ sourceDir, archiveDir, targetDir });
+        assert.strictEqual(reopenSync.total, 2);
+        assert.strictEqual(reopenSync.activeCount, 2);
+        assert.strictEqual(reopenSync.archivedCount, 0);
+        assert.deepStrictEqual(reopenSync.removed, []);
+        assert.strictEqual(
+            JSON.parse(readFileSync(join(targetDir, 'edital_a.json'), 'utf-8')).status,
+            'aberto'
+        );
+    });
+
+    test('dá precedência a data/output/ em caso de colisão com data/arquivo/ e tolera ausência de data/arquivo/', () => {
+        const archiveDir = join(tempDir, 'archive');
+        mkdirSync(archiveDir);
+
+        writeFileSync(join(archiveDir, 'duplicado.json'), JSON.stringify({ nome: 'Versão arquivo' }));
+        writeFileSync(join(sourceDir, 'duplicado.json'), JSON.stringify({ nome: 'Versão output' }));
+
+        const result = syncData({ sourceDir, archiveDir, targetDir });
+        assert.strictEqual(result.total, 1);
+        assert.strictEqual(result.activeCount, 1);
+        assert.strictEqual(result.archivedCount, 0);
+        assert.strictEqual(
+            JSON.parse(readFileSync(join(targetDir, 'duplicado.json'), 'utf-8')).nome,
+            'Versão output'
+        );
+
+        // archiveDir inexistente não falha
+        const noArchive = syncData({
+            sourceDir,
+            archiveDir: join(tempDir, 'arquivo-inexistente'),
+            targetDir,
+        });
+        assert.strictEqual(noArchive.total, 1);
+        assert.strictEqual(noArchive.archivedCount, 0);
+    });
+
+    test('editais arquivados sincronizados com status encerrado não disparam envio no Telegram', async () => {
+        const archiveDir = join(tempDir, 'archive');
+        const registryDir = join(tempDir, 'registry');
+        const registryFile = join(registryDir, 'downloads_registry.json');
+        mkdirSync(archiveDir);
+        mkdirSync(registryDir);
+
+        writeFileSync(
+            join(sourceDir, 'ativo.json'),
+            JSON.stringify({
+                nome: 'Edital Ativo',
+                categoria: 'pesquisa',
+                status: 'aberto',
+                link: 'https://example.com/ativo',
+            })
+        );
+        writeFileSync(
+            join(archiveDir, 'arquivado.json'),
+            JSON.stringify({
+                nome: 'Edital Arquivado 2024',
+                categoria: 'pesquisa',
+                status: 'encerrado',
+                data_encerramento: '2024-06-01',
+                link: 'https://example.com/arquivado',
+            })
+        );
+
+        syncData({ sourceDir, archiveDir, targetDir });
+
+        const sentMessages = [];
+        const originalFetch = global.fetch;
+        process.env.TELEGRAM_BOT_TOKEN = 'test-token';
+        process.env.TELEGRAM_CHAT_ID = 'test-chat';
+        global.fetch = async (url, init) => {
+            const body = JSON.parse(init?.body || '{}');
+            if (String(url).includes('sendMessage')) {
+                sentMessages.push(body.text || '');
+                return { ok: true, status: 200, json: async () => ({ ok: true }) };
+            }
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({ ok: true, result: { message_thread_id: 123 } }),
+            };
+        };
+        try {
+            await runNotify(targetDir, registryFile);
+        } finally {
+            global.fetch = originalFetch;
+            delete process.env.TELEGRAM_BOT_TOKEN;
+            delete process.env.TELEGRAM_CHAT_ID;
+        }
+
+        assert.strictEqual(sentMessages.length, 1);
+        assert.ok(sentMessages[0].includes('Edital Ativo'));
+        assert.strictEqual(sentMessages[0].includes('Edital Arquivado 2024'), false);
+    });
 });

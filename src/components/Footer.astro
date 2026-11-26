@@ -1,5 +1,7 @@
 ---
+import { getPluginConfig } from "../utils/plugins.js";
 
+const { hasTelemetry } = getPluginConfig(import.meta.env);
 ---
 
 <footer class="py-12 mt-20 border-t border-primary-100 dark:border-white/5">
@@ -20,5 +22,19 @@
         >
             Fomento à Ciência e Inovação
         </p>
+        {
+            hasTelemetry && (
+                <div class="pt-1">
+                    <button
+                        type="button"
+                        data-testid="cookie-preferences-trigger"
+                        onclick="window.dispatchEvent(new CustomEvent('portal:open-cookie-preferences'))"
+                        class="text-xs font-medium text-primary-500 dark:text-primary-400 underline hover:text-cta-600 dark:hover:text-cta-400 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500 rounded"
+                    >
+                        Preferências de cookies
+                    </button>
+                </div>
+            )
+        }
     </div>
 </footer>

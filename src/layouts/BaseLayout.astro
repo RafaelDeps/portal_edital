@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import AccessibilityMenu from "../components/AccessibilityMenu.astro";
+import ThirdPartyPlugins from "../components/ThirdPartyPlugins.astro";
 
 interface Props {
 	title: string;
@@ -76,6 +77,7 @@ const {
 		</a>
 		<slot />
 		<AccessibilityMenu />
+		<ThirdPartyPlugins />
 		<script is:inline>
 			(function () {
 				function parseLocalDate(str) {
