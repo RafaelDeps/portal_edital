@@ -28,3 +28,9 @@ pnpm-debug.log*
 
 # ZIP de dados gerado no build
 public/dados-editais.zip
+
+# Relatórios de testes Playwright e diretório residual de template
+test-results/
+playwright-report/
+agreeable-aurora/
+

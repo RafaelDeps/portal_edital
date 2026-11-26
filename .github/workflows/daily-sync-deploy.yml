@@ -14,23 +14,21 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   sync-and-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout portal repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync data from retrieve_edital
-        run: |
-          git clone --depth 1 https://github.com/ifesserra-lab/retrieve_edital.git temp_data
-          cp -r temp_data/data/output/*.json data/
-          rm -rf temp_data
-
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: 'npm'
@@ -38,8 +36,32 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Generate dados-editais.zip
-        run: node scripts/zip-data.js
+      - name: Sync data from retrieve_edital
+        run: node scripts/sync-data.js
+
+      - name: Validate data schema
+        run: node scripts/validate-data.js
+
+      - name: Run script tests
+        run: npm run test:scripts
+
+      - name: Build site with Astro
+        run: npm run build
+
+      - name: Index searches with Pagefind
+        run: npx pagefind --site dist
+
+      - name: Commit and push synced data
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "No changes in data to commit"
+          else
+            git commit -m "data: daily sync"
+            git push origin main
+          fi
 
       - name: Notify Telegram (New Editals & Daily Reminders)
         env:
@@ -49,29 +71,17 @@ jobs:
           node scripts/notify-telegram.js
           node scripts/schedule-reminders.js
 
-      - name: Commit synced data and registry
+      - name: Commit and push updated registry
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/*.json registry/
+          git add registry/
           if git diff --staged --quiet; then
-            echo "No changes in data to commit"
+            echo "No changes in registry to commit"
           else
-            git commit -m "data: daily sync and registry update"
+            git commit -m "chore: update telegram registry"
             git push origin main
           fi
-
-      - name: Run Script Tests
-        run: npm run test:scripts
-
-      - name: Sync data from FAPES
-        run: node scripts/validate-data.js
-
-      - name: Build with Astro
-        run: npm run build
-
-      - name: Index searches with Pagefind
-        run: npx pagefind --site dist
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

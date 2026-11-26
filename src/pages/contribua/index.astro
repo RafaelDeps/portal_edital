@@ -4,8 +4,8 @@ import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
 
 const base = import.meta.env.BASE_URL;
-const repoIssues = "https://github.com/ifesserra-lab/portal_edital/issues/new";
-const repo = "https://github.com/ifesserra-lab/portal_edital";
+const repoIssues = "https://github.com/RafaelDeps/portal_edital/issues/new";
+const repo = "https://github.com/RafaelDeps/portal_edital";
 ---
 
 <BaseLayout
@@ -35,6 +35,146 @@ const repo = "https://github.com/ifesserra-lab/portal_edital";
         <p class="text-primary-500 dark:text-primary-400">
           Não é necessário ter conta desenvolvedor: basta uma conta no GitHub (gratuita) para abrir uma issue.
         </p>
+      </section>
+
+      <section
+        id="indicar-edital"
+        data-testid="indicar-edital-section"
+        class="glass p-6 sm:p-8 rounded-2xl border border-cta-500/30 mb-12"
+      >
+        <div class="mb-6">
+          <h2 class="text-2xl font-black text-primary-900 dark:text-white mb-2">
+            Indicar edital
+          </h2>
+          <p class="text-primary-600 dark:text-primary-300">
+            Conhece um edital que ainda não está listado no portal? Preencha os dados públicos abaixo para abrir a indicação já pré-preenchida no GitHub.
+          </p>
+        </div>
+
+        <div
+          data-testid="indicar-lgpd-aviso"
+          class="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-primary-800 dark:text-amber-100"
+        >
+          <strong>Privacidade (LGPD):</strong> não inclua dados pessoais (nome, e-mail, telefone ou CPF). As informações enviadas serão publicadas em uma issue pública no GitHub.
+        </div>
+
+        <form
+          id="indicar-edital-form"
+          data-testid="indicar-edital-form"
+          novalidate
+          class="space-y-5"
+        >
+          <div>
+            <label
+              for="indicar-link-oficial"
+              class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+            >
+              Link oficial do edital <span class="text-red-600 dark:text-red-400" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="indicar-link-oficial"
+              name="link_oficial"
+              type="url"
+              required
+              data-testid="indicar-link-oficial"
+              placeholder="https://fapes.es.gov.br/edital-exemplo"
+              class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-primary-900 dark:text-white placeholder:text-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+            />
+          </div>
+
+          <div>
+            <label
+              for="indicar-orgao"
+              class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+            >
+              Órgão de fomento / Instituição <span class="text-red-600 dark:text-red-400" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="indicar-orgao"
+              name="orgao"
+              type="text"
+              required
+              data-testid="indicar-orgao"
+              placeholder="Ex.: FAPES, CNPq, FINEP, CAPES, IFES"
+              class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-primary-900 dark:text-white placeholder:text-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+            />
+          </div>
+
+          <div>
+            <label
+              for="indicar-prazo"
+              class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+            >
+              Prazo de encerramento <span class="text-xs font-normal text-primary-500 dark:text-primary-400">(opcional)</span>
+            </label>
+            <input
+              id="indicar-prazo"
+              name="prazo"
+              type="text"
+              data-testid="indicar-prazo"
+              placeholder="Ex.: 15/12/2026 ou 2026-12-15"
+              class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-primary-900 dark:text-white placeholder:text-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+            />
+          </div>
+
+          <div>
+            <label
+              for="indicar-observacoes"
+              class="block text-sm font-semibold text-primary-900 dark:text-white mb-1.5"
+            >
+              Observações <span class="text-xs font-normal text-primary-500 dark:text-primary-400">(opcional)</span>
+            </label>
+            <textarea
+              id="indicar-observacoes"
+              name="observacoes"
+              rows="3"
+              data-testid="indicar-observacoes"
+              placeholder="Detalhes úteis sobre o edital (área temática, chamadas, retificações)."
+              class="w-full rounded-xl border border-primary-300 dark:border-primary-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-primary-900 dark:text-white placeholder:text-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+            ></textarea>
+          </div>
+
+          <div
+            id="indicar-erro"
+            data-testid="indicar-erro"
+            role="alert"
+            class="hidden rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-700 dark:text-red-300"
+          ></div>
+
+          <div class="flex flex-wrap items-center gap-4 pt-2">
+            <button
+              type="submit"
+              data-testid="indicar-submit"
+              class="inline-flex items-center gap-2 rounded-xl bg-cta-600 hover:bg-cta-700 text-white font-semibold px-6 py-3 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+            >
+              Abrir indicação no GitHub
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </button>
+
+            <a
+              id="indicar-github-link"
+              data-testid="indicar-github-link"
+              href={`${repoIssues}?template=indicar-edital.yml&labels=indicacao-edital`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hidden text-sm font-semibold text-cta-600 dark:text-cta-400 underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500 rounded"
+            >
+              Link pré-preenchido pronto (clique se a aba não abriu)
+            </a>
+
+            <a
+              data-testid="indicar-link-direto"
+              href={`${repoIssues}?template=indicar-edital.yml`}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-sm font-semibold text-primary-600 dark:text-primary-300 underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500 rounded"
+            >
+              Ou abrir modelo em branco no GitHub
+            </a>
+          </div>
+        </form>
       </section>
 
       <section class="mb-10">
@@ -140,3 +280,87 @@ const repo = "https://github.com/ifesserra-lab/portal_edital";
   </main>
   <Footer />
 </BaseLayout>
+
+<script>
+  import {
+    validateIndicacao,
+    buildIndicarEditalUrl,
+  } from "../../utils/indicarEdital.js";
+
+  const form = document.getElementById("indicar-edital-form") as HTMLFormElement | null;
+  const linkInput = document.getElementById("indicar-link-oficial") as HTMLInputElement | null;
+  const orgaoInput = document.getElementById("indicar-orgao") as HTMLInputElement | null;
+  const prazoInput = document.getElementById("indicar-prazo") as HTMLInputElement | null;
+  const obsInput = document.getElementById("indicar-observacoes") as HTMLTextAreaElement | null;
+  const errorBox = document.getElementById("indicar-erro");
+  const githubLink = document.getElementById("indicar-github-link") as HTMLAnchorElement | null;
+
+  function readValues() {
+    return {
+      link_oficial: linkInput?.value ?? "",
+      orgao: orgaoInput?.value ?? "",
+      prazo: prazoInput?.value ?? "",
+      observacoes: obsInput?.value ?? "",
+    };
+  }
+
+  function updateLinkPreview() {
+    if (!githubLink) return;
+    const values = readValues();
+    const validation = validateIndicacao(values);
+    if (validation.valid) {
+      githubLink.href = buildIndicarEditalUrl(values);
+    }
+  }
+
+  [linkInput, orgaoInput, prazoInput, obsInput].forEach((el) => {
+    el?.addEventListener("input", () => {
+      updateLinkPreview();
+      if (errorBox && !errorBox.classList.contains("hidden")) {
+        const validation = validateIndicacao(readValues());
+        if (validation.valid) {
+          errorBox.classList.add("hidden");
+          errorBox.textContent = "";
+          linkInput?.removeAttribute("aria-invalid");
+          orgaoInput?.removeAttribute("aria-invalid");
+        }
+      }
+    });
+  });
+
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const values = readValues();
+    const validation = validateIndicacao(values);
+
+    linkInput?.setAttribute("aria-invalid", validation.errors.link_oficial ? "true" : "false");
+    orgaoInput?.setAttribute("aria-invalid", validation.errors.orgao ? "true" : "false");
+
+    if (!validation.valid) {
+      const messages = Object.values(validation.errors);
+      if (errorBox) {
+        errorBox.textContent = messages.join(" ");
+        errorBox.classList.remove("hidden");
+      }
+      if (validation.errors.link_oficial) {
+        linkInput?.focus();
+      } else if (validation.errors.orgao) {
+        orgaoInput?.focus();
+      }
+      return;
+    }
+
+    if (errorBox) {
+      errorBox.classList.add("hidden");
+      errorBox.textContent = "";
+    }
+
+    const targetUrl = buildIndicarEditalUrl(values);
+    if (githubLink) {
+      githubLink.href = targetUrl;
+      githubLink.classList.remove("hidden");
+    }
+
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  });
+</script>

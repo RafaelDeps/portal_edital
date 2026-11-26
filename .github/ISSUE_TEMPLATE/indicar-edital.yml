@@ -1,0 +1,46 @@
+name: Indicar edital
+description: Indique um edital aberto ou previsto que ainda não aparece no Portal de Editais.
+title: "[Indicação] "
+labels: ["indicacao-edital"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Aviso de privacidade (LGPD)
+        Esta issue é pública. **Não inclua dados pessoais** como nome completo, e-mail, telefone ou CPF. Informe apenas os dados públicos do edital.
+
+  - type: input
+    id: link_oficial
+    attributes:
+      label: Link oficial do edital
+      description: Cole a URL completa (http:// ou https://) da página oficial ou PDF do edital.
+      placeholder: https://fapes.es.gov.br/edital-exemplo
+    validations:
+      required: true
+
+  - type: input
+    id: orgao
+    attributes:
+      label: Órgão de fomento / Instituição
+      description: Nome ou sigla da instituição responsável pelo edital.
+      placeholder: Ex.: FAPES, CNPq, FINEP, CAPES, IFES
+    validations:
+      required: true
+
+  - type: input
+    id: prazo
+    attributes:
+      label: Prazo de encerramento (opcional)
+      description: Informe a data limite de submissão, se conhecida.
+      placeholder: Ex.: 15/12/2026 ou 2026-12-15
+    validations:
+      required: false
+
+  - type: textarea
+    id: observacoes
+    attributes:
+      label: Observações (opcional)
+      description: Informações adicionais relevantes sobre o edital (ex.: área temática, chamadas, retificações). Não informe dados pessoais.
+      placeholder: Ex.: Edital com duas chamadas previstas; voltado para pesquisa aplicada.
+    validations:
+      required: false

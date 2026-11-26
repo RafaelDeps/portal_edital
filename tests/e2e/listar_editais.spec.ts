@@ -51,5 +51,27 @@ test.describe('Portal de Editais - Listagem', () => {
         // Verificar que o parametro q sumiu
         await expect(page).not.toHaveURL(/.*q=/);
     });
+
+    test('Editais vencidos não aparecem na home como abertos nem com selo fechando', async ({ page }) => {
+        const cards = page.locator('[data-testid="edital-card"]');
+        const count = await cards.count();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (let i = 0; i < count; i++) {
+            const card = cards.nth(i);
+            const status = await card.getAttribute('data-status');
+            const encerramento = await card.getAttribute('data-encerramento');
+
+            expect(status).not.toBe('encerrado');
+            if (encerramento) {
+                const match = encerramento.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (match) {
+                    const endDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+                    expect(endDate.getTime()).toBeGreaterThanOrEqual(today.getTime());
+                }
+            }
+        }
+    });
 });
 

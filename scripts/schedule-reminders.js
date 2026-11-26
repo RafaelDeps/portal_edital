@@ -1,191 +1,125 @@
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { readFileSync, readdirSync, existsSync } from 'fs';
+import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { loadEnv } from './load-env.js';
 import { normalizeCategory } from '../src/utils/category.js';
 import { run as syncCategories } from './sync-categories.js';
+import { PORTAL_URL } from './config.js';
+import { escapeHtml, getOrCreateTopicId, sendMessage, sleep } from './telegram.js';
+import {
+    META_KEY,
+    getEditalKey,
+    loadRegistry,
+    migrateRegistry,
+    saveRegistry,
+} from './registry.js';
 
 loadEnv();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 const DEFAULT_DATA_DIR = 'data';
 const DEFAULT_REGISTRY_FILE = join('registry', 'downloads_registry.json');
-const TOPICS_REGISTRY = join('registry', 'topics_registry.json');
-const PORTAL_URL = 'https://ifesserra-lab.github.io/portal_edital';
+const ISO_DATE_RE = /\b(\d{4}-\d{2}-\d{2})\b/;
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function getOrCreateTopicId(category) {
-    if (!category || category === 'N/A' || category.toLowerCase() === 'sem categoria') return null;
-
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!token || !chatId) return null;
-
-    let topics = {};
-    if (existsSync(TOPICS_REGISTRY)) {
-        topics = JSON.parse(readFileSync(TOPICS_REGISTRY, 'utf-8'));
-    }
-
-    const normalizedCategory = category.trim().toLowerCase();
-    if (topics[normalizedCategory]) return topics[normalizedCategory];
-
-    // Create new topic
-    console.log(`🏗️ Creating new Telegram topic for category: ${category}`);
-    const url = `https://api.telegram.org/bot${token}/createForumTopic`;
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                name: category.charAt(0).toUpperCase() + category.slice(1)
-            })
-        });
-        const result = await response.json();
-        if (result.ok) {
-            const topicId = result.result.message_thread_id;
-            topics[normalizedCategory] = topicId;
-            writeFileSync(TOPICS_REGISTRY, JSON.stringify(topics, null, 4));
-            return topicId;
-        } else if (result.error_code === 429) {
-            const waitTime = (result.parameters?.retry_after || 5) * 1000;
-            console.warn(`🛑 Rate limited while creating topic. Waiting ${waitTime/1000}s...`);
-            await sleep(waitTime);
-            return getOrCreateTopicId(category); // Retry
-        } else {
-            console.error(`❌ Failed to create topic: ${result.description}`);
-            return null;
-        }
-    } catch (err) {
-        console.error(`❌ Error creating topic: ${err.message}`);
-        return null;
-    }
+export function extractIsoDate(eventDate) {
+    if (typeof eventDate !== 'string') return null;
+    const match = eventDate.match(ISO_DATE_RE);
+    return match ? match[1] : null;
 }
 
-async function sendTelegramMessage(text, topicId = null) {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-
-    if (!token || !chatId) {
-        console.warn('⚠️ Telegram credentials not found. Skipping notification.');
-        return false;
-    }
-
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                message_thread_id: topicId,
-                text: text,
-                parse_mode: 'HTML',
-                disable_web_page_preview: false
-            })
-        });
-
-        if (response.ok) {
-            console.log('✅ Telegram reminder sent!');
-            return true;
-        }
-
-        const result = await response.json();
-        if (result.error_code === 429) {
-            const waitTime = (result.parameters?.retry_after || 5) * 1000;
-            console.warn(`🛑 Rate limited. Waiting ${waitTime/1000}s...`);
-            await sleep(waitTime);
-            return sendTelegramMessage(text, topicId); // Retry
-        } else {
-            console.error(`❌ Failed to send Telegram message: ${result.description}`);
-            return false;
-        }
-    } catch (err) {
-        console.error(`❌ Error sending Telegram message: ${err.message}`);
-        return false;
-    }
+export function isDateInRecoveryWindow(isoDate, windowStart, windowEnd) {
+    if (!isoDate) return false;
+    return isoDate >= windowStart && isoDate <= windowEnd;
 }
 
-function getRegistry(registryPath) {
-    if (existsSync(registryPath)) {
-        try {
-            return JSON.parse(readFileSync(registryPath, 'utf-8'));
-        } catch (e) {
-            console.error(`❌ Error reading registry: ${e.message}`);
-            return {};
-        }
-    }
-    return {};
-}
-
-export async function run(dataDir = DEFAULT_DATA_DIR, registryFile = DEFAULT_REGISTRY_FILE) {
+export async function run(
+    dataDir = DEFAULT_DATA_DIR,
+    registryFile = DEFAULT_REGISTRY_FILE,
+    { today = new Date().toISOString().split('T')[0], delayMs = 2000 } = {}
+) {
     syncCategories(dataDir);
-    const registry = getRegistry(registryFile);
-    const files = existsSync(dataDir) ? readdirSync(dataDir).filter(file => file.endsWith('.json')) : [];
-    
-    // Get today's date in YYYY-MM-DD
-    const today = new Date().toISOString().split('T')[0];
-    console.log(`🔎 Checking reminders for: ${today}`);
-    
-    let stateChanged = false;
+    const registry = loadRegistry(registryFile);
+    let stateChanged = migrateRegistry(registry, dataDir);
+
+    const files = existsSync(dataDir)
+        ? readdirSync(dataDir).filter((file) => file.endsWith('.json'))
+        : [];
+
+    const lastRun = registry[META_KEY]?.last_reminders_run;
+    const windowStart = lastRun && lastRun < today ? lastRun : today;
+    console.log(`🔎 Checking reminders for window: ${windowStart} .. ${today}`);
+
+    let hadSendFailure = false;
 
     for (const file of files) {
         const filePath = join(dataDir, file);
         try {
             const content = JSON.parse(readFileSync(filePath, 'utf-8'));
-            const cronograma = content.cronograma || [];
+            const cronograma = Array.isArray(content.cronograma) ? content.cronograma : [];
             const editalName = content.nome || file;
             const category = normalizeCategory(content.categoria);
             const editalLink = content.link || PORTAL_URL;
+            const key = getEditalKey(content, file);
 
-            // Initialize notification tracking if not present
-            if (!registry[file]) {
-                registry[file] = {
-                    data_entrada: new Date().toISOString(),
-                    categoria: category,
-                    cronograma: cronograma
-                };
-            }
-            if (!registry[file].notificacoes_enviadas) {
-                registry[file].notificacoes_enviadas = [];
-            }
+            const sentList = Array.isArray(registry[key]?.notificacoes_enviadas)
+                ? registry[key].notificacoes_enviadas
+                : [];
 
             for (const item of cronograma) {
+                if (!item || typeof item.data !== 'string') {
+                    console.warn(
+                        `⚠️ Evento com data inválida em ${file} (${item?.evento || 'sem nome'}). Pulando evento.`
+                    );
+                    continue;
+                }
+
                 const eventDate = item.data;
-                const eventName = item.evento;
+                const eventName = item.evento || 'Evento';
+                const isoDate = extractIsoDate(eventDate);
 
-                // Check if the event date matches today (handles "YYYY-MM-DD" or "A partir de YYYY-MM-DD")
-                if (eventDate.includes(today)) {
-                    const notificationKey = `${eventName}_${eventDate}`;
+                if (!isDateInRecoveryWindow(isoDate, windowStart, today)) {
+                    continue;
+                }
 
-                    // Only send if not already sent
-                    if (!registry[file].notificacoes_enviadas.includes(notificationKey)) {
-                        console.log(`⏰ Reminder trigger: ${editalName} - ${eventName}`);
-                        
-                        const message = `⏰ <b>Lembrete de Cronograma!</b>\n\n` +
-                                        `<b>📌 Edital:</b> ${editalName}\n` +
-                                        `<b>📁 Categoria:</b> ${category}\n` +
-                                        `<b>📅 Evento:</b> <i>${eventName}</i>\n` +
-                                        `<b>ℹ️ Data prevista:</b> ${eventDate}\n\n` +
-                                        `<b>🌐 Ver mais no portal:</b> <a href="${PORTAL_URL}">Acessar site</a>\n` +
-                                        `<b>🔗 Link direto:</b> <a href="${editalLink}">Abrir documento</a>`;
+                const notificationKey = `${eventName}_${eventDate}`;
+                if (sentList.includes(notificationKey)) {
+                    continue;
+                }
 
-                        const topicId = await getOrCreateTopicId(category);
-                        const success = await sendTelegramMessage(message, topicId);
-                        
-                        if (success) {
-                            registry[file].notificacoes_enviadas.push(notificationKey);
-                            stateChanged = true;
-                            // Add delay to avoid rate limits
-                            await sleep(2000);
-                        } else {
-                            console.warn(`🛑 Skipping reminder tracking for ${file} due to failure.`);
-                        }
+                console.log(`⏰ Reminder trigger: ${editalName} - ${eventName}`);
+
+                const message =
+                    `⏰ <b>Lembrete de Cronograma!</b>\n\n` +
+                    `<b>📌 Edital:</b> ${escapeHtml(editalName)}\n` +
+                    `<b>📁 Categoria:</b> ${escapeHtml(category)}\n` +
+                    `<b>📅 Evento:</b> <i>${escapeHtml(eventName)}</i>\n` +
+                    `<b>ℹ️ Data prevista:</b> ${escapeHtml(eventDate)}\n\n` +
+                    `<b>🌐 Ver mais no portal:</b> <a href="${escapeHtml(PORTAL_URL)}">Acessar site</a>\n` +
+                    `<b>🔗 Link direto:</b> <a href="${escapeHtml(editalLink)}">Abrir documento</a>`;
+
+                const topicId = await getOrCreateTopicId(category);
+                const success = await sendMessage(message, topicId, {
+                    successLog: '✅ Telegram reminder sent!',
+                });
+
+                if (success) {
+                    if (!registry[key]) {
+                        registry[key] = {
+                            anunciado: false,
+                            notificacoes_enviadas: [],
+                        };
                     }
+                    if (!Array.isArray(registry[key].notificacoes_enviadas)) {
+                        registry[key].notificacoes_enviadas = [];
+                    }
+                    registry[key].notificacoes_enviadas.push(notificationKey);
+                    sentList.push(notificationKey);
+                    stateChanged = true;
+                    if (delayMs > 0) {
+                        await sleep(delayMs);
+                    }
+                } else {
+                    hadSendFailure = true;
+                    console.warn(`🛑 Skipping reminder tracking for ${file} due to failure.`);
                 }
             }
         } catch (err) {
@@ -193,15 +127,26 @@ export async function run(dataDir = DEFAULT_DATA_DIR, registryFile = DEFAULT_REG
         }
     }
 
+    if (!hadSendFailure && registry[META_KEY]?.last_reminders_run !== today) {
+        registry[META_KEY] = {
+            ...(registry[META_KEY] || {}),
+            last_reminders_run: today,
+        };
+        stateChanged = true;
+    }
+
     if (stateChanged) {
-        writeFileSync(registryFile, JSON.stringify(registry, null, 4));
+        saveRegistry(registryFile, registry);
         console.log('💾 Registry updated with sent notifications.');
     } else {
         console.log('✨ No reminders to send today.');
     }
 }
 
-// Auto-run if executed directly
-if (process.argv[1] && (process.argv[1].endsWith('schedule-reminders.js') || fileURLToPath(import.meta.url) === process.argv[1])) {
+if (
+    process.argv[1] &&
+    (process.argv[1].endsWith('schedule-reminders.js') ||
+        fileURLToPath(import.meta.url) === process.argv[1])
+) {
     run();
 }

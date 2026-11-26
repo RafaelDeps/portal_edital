@@ -4,6 +4,7 @@ import Header from "../../components/Header.astro";
 import Footer from "../../components/Footer.astro";
 import { getCollection } from "astro:content";
 import { getCategoryLabel } from "../../utils/category.js";
+import { analyzeChamadas, formatLongDate } from "../../utils/chamadas.js";
 
 export async function getStaticPaths() {
     const editais = await getCollection("editais");
@@ -16,6 +17,25 @@ export async function getStaticPaths() {
 const { edital } = Astro.props;
 const { data } = edital;
 const categoryLabel = getCategoryLabel(data.categoria);
+const chamadasInfo = analyzeChamadas(data.chamadas ?? []);
+
+const chamadaStatusBadge: Record<string, { label: string; classes: string }> = {
+    aberta: {
+        label: "Aberta",
+        classes:
+            "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/30",
+    },
+    prevista: {
+        label: "Prevista",
+        classes:
+            "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300 border-blue-300 dark:border-blue-500/30",
+    },
+    encerrada: {
+        label: "Encerrada",
+        classes:
+            "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+    },
+};
 
 const statusColors: Record<string, string> = {
     aberto: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20",
@@ -96,6 +116,70 @@ const statusColors: Record<string, string> = {
                         </p>
                     </section>
 
+                    {
+                        chamadasInfo.items.length > 0 && (
+                            <section
+                                class="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5"
+                                data-testid="edital-chamadas"
+                            >
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">
+                                        Chamadas
+                                    </h2>
+                                    {chamadasInfo.highlightText && (
+                                        <span
+                                            class="inline-flex items-center gap-2 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-300 dark:border-emerald-500/30 px-4 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300"
+                                            data-testid="chamada-aberta-destaque"
+                                        >
+                                            <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                                            {chamadasInfo.highlightText}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <ul class="space-y-3">
+                                    {chamadasInfo.items.map((chamada) => {
+                                        const badge =
+                                            chamadaStatusBadge[chamada.status] ??
+                                            chamadaStatusBadge.encerrada;
+                                        const isActive = chamada.status === "aberta";
+                                        return (
+                                            <li
+                                                data-testid="chamada-item"
+                                                data-chamada-status={chamada.status}
+                                                class={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 ${
+                                                    isActive
+                                                        ? "border-emerald-300 dark:border-emerald-500/40 bg-emerald-50/70 dark:bg-emerald-500/5"
+                                                        : "border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40"
+                                                }`}
+                                            >
+                                                <div class="space-y-1">
+                                                    <p class="font-bold text-slate-900 dark:text-white">
+                                                        {chamada.nome}
+                                                    </p>
+                                                    <p class="text-sm text-slate-600 dark:text-slate-400">
+                                                        {chamada.aberturaFormatada
+                                                            ? `Início: ${chamada.aberturaFormatada}`
+                                                            : "Início: —"}
+                                                        {" · "}
+                                                        {chamada.encerramentoFormatado
+                                                            ? `Encerramento: ${chamada.encerramentoFormatado}`
+                                                            : "Encerramento: —"}
+                                                    </p>
+                                                </div>
+                                                <span
+                                                    class={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${badge.classes}`}
+                                                >
+                                                    {badge.label}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </section>
+                        )
+                    }
+
                     <section
                         class="p-6 sm:p-8 rounded-3xl bg-primary-50 dark:bg-primary-500/5 border border-primary-100 dark:border-primary-500/10"
                     >
@@ -145,39 +229,38 @@ const statusColors: Record<string, string> = {
                             >
                                 Cronograma
                             </h3>
-                            <ul class="space-y-6">
-                                {
-                                    data.cronograma.map((item, index) => (
-                                        <li
-                                            class="relative pl-6 pb-2 last:pb-0"
-                                            data-testid="cronograma-item"
-                                        >
-                                            {index !==
-                                                data.cronograma.length - 1 && (
-                                                <span class="absolute left-[3px] top-6 bottom-0 w-px bg-slate-200 dark:bg-slate-800" />
-                                            )}
-                                            <span class="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-primary-500" />
-                                            <div class="flex flex-col gap-1">
-                                                <span class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">
-                                                    {new Date(
-                                                        item.data,
-                                                    ).toLocaleDateString(
-                                                        "pt-BR",
-                                                        {
-                                                            day: "2-digit",
-                                                            month: "long",
-                                                            year: "numeric",
-                                                        },
+                            {
+                                data.cronograma.length > 0 ? (
+                                    <ul class="space-y-6">
+                                        {
+                                            data.cronograma.map((item, index) => (
+                                                <li
+                                                    class="relative pl-6 pb-2 last:pb-0"
+                                                    data-testid="cronograma-item"
+                                                >
+                                                    {index !==
+                                                        data.cronograma.length - 1 && (
+                                                        <span class="absolute left-[3px] top-6 bottom-0 w-px bg-slate-200 dark:bg-slate-800" />
                                                     )}
-                                                </span>
-                                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300 leading-tight">
-                                                    {item.evento}
-                                                </span>
-                                            </div>
-                                        </li>
-                                    ))
-                                }
-                            </ul>
+                                                    <span class="absolute left-0 top-1.5 h-2 w-2 rounded-full bg-primary-500" />
+                                                    <div class="flex flex-col gap-1">
+                                                        <span class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">
+                                                            {formatLongDate(item.data)}
+                                                        </span>
+                                                        <span class="text-sm font-medium text-slate-700 dark:text-slate-300 leading-tight">
+                                                            {item.evento}
+                                                        </span>
+                                                    </div>
+                                                </li>
+                                            ))
+                                        }
+                                    </ul>
+                                ) : (
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        Cronograma não informado.
+                                    </p>
+                                )
+                            }
                         </div>
 
                         {
