@@ -131,6 +131,36 @@ export function validateEditalObject(data, fileName = '<memory>') {
         }
     }
 
+    if (data.elegibilidade !== undefined && data.elegibilidade !== null) {
+        if (!isPlainObject(data.elegibilidade)) {
+            addError('elegibilidade', 'Campo opcional elegibilidade deve ser um objeto ou null.');
+        } else {
+            const eleg = data.elegibilidade;
+            if (eleg.titulacao_minima !== undefined && typeof eleg.titulacao_minima !== 'string') {
+                addError('elegibilidade.titulacao_minima', 'Campo titulacao_minima deve ser uma string.');
+            }
+            if (eleg.requisitos_resumo !== undefined && typeof eleg.requisitos_resumo !== 'string') {
+                addError('elegibilidade.requisitos_resumo', 'Campo requisitos_resumo deve ser uma string.');
+            }
+            for (const arrayField of ['publico_alvo', 'areas_conhecimento']) {
+                if (eleg[arrayField] !== undefined) {
+                    if (!Array.isArray(eleg[arrayField])) {
+                        addError(`elegibilidade.${arrayField}`, `Campo ${arrayField} deve ser um array de strings.`);
+                    } else {
+                        eleg[arrayField].forEach((val, idx) => {
+                            if (typeof val !== 'string') {
+                                addError(
+                                    `elegibilidade.${arrayField}[${idx}]`,
+                                    `Cada item de ${arrayField} deve ser uma string.`
+                                );
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     return errors;
 }
 
