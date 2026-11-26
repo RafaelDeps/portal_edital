@@ -1,0 +1,175 @@
+---
+import { getPluginConfig } from "../utils/plugins.js";
+
+const config = getPluginConfig(import.meta.env);
+---
+
+{
+    config.userwayId && (
+        <script
+            src="https://cdn.userway.org/widget.js"
+            data-account={config.userwayId}
+            data-language="pt"
+            data-position="5"
+            async
+            defer
+        ></script>
+    )
+}
+
+{
+    config.hasTelemetry && (
+        <>
+            <div
+                id="cookie-consent-banner"
+                data-testid="cookie-consent-banner"
+                role="dialog"
+                aria-label="Preferências de cookies"
+                aria-live="polite"
+                class="hidden fixed bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-md z-[110] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-2xl print:hidden"
+            >
+                <div class="space-y-3">
+                    <p class="text-sm font-bold text-slate-900 dark:text-white">
+                        Privacidade e Cookies (LGPD)
+                    </p>
+                    <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                        Usamos ferramentas de análise de uso (Google Analytics e Microsoft Clarity) apenas com sua permissão para melhorar o portal. Nenhum dado pessoal sensível é coletado.
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                            id="cookie-consent-accept"
+                            type="button"
+                            data-testid="cookie-consent-accept"
+                            class="rounded-xl bg-cta-600 hover:bg-cta-700 text-white text-xs font-bold px-4 py-2 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                        >
+                            Aceitar
+                        </button>
+                        <button
+                            id="cookie-consent-reject"
+                            type="button"
+                            data-testid="cookie-consent-reject"
+                            class="rounded-xl border border-slate-300 dark:border-slate-600 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold px-4 py-2 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cta-500"
+                        >
+                            Recusar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <script
+                is:inline
+                define:vars={{
+                    clarityId: config.clarityId,
+                    gaId: config.gaId,
+                }}
+            >
+                (function () {
+                    var STORAGE_KEY = "portal-edital-cookie-consent";
+                    var banner = document.getElementById("cookie-consent-banner");
+                    var acceptBtn = document.getElementById("cookie-consent-accept");
+                    var rejectBtn = document.getElementById("cookie-consent-reject");
+                    var telemetryLoaded = false;
+
+                    function loadClarity() {
+                        if (!clarityId || document.getElementById("ms-clarity-script")) return;
+                        window.clarity =
+                            window.clarity ||
+                            function () {
+                                (window.clarity.q = window.clarity.q || []).push(arguments);
+                            };
+                        var s = document.createElement("script");
+                        s.id = "ms-clarity-script";
+                        s.async = true;
+                        s.src = "https://www.clarity.ms/tag/" + clarityId;
+                        document.head.appendChild(s);
+                    }
+
+                    function loadGa() {
+                        if (!gaId) return;
+                        window["ga-disable-" + gaId] = false;
+                        if (document.getElementById("ga4-gtag-script")) return;
+                        window.dataLayer = window.dataLayer || [];
+                        function gtag() {
+                            window.dataLayer.push(arguments);
+                        }
+                        window.gtag = window.gtag || gtag;
+                        window.gtag("js", new Date());
+                        window.gtag("config", gaId, { anonymize_ip: true });
+
+                        var s = document.createElement("script");
+                        s.id = "ga4-gtag-script";
+                        s.async = true;
+                        s.src = "https://www.googletagmanager.com/gtag/js?id=" + gaId;
+                        document.head.appendChild(s);
+                    }
+
+                    function activateTelemetry() {
+                        if (telemetryLoaded) {
+                            if (gaId) window["ga-disable-" + gaId] = false;
+                            return;
+                        }
+                        telemetryLoaded = true;
+                        loadClarity();
+                        loadGa();
+                    }
+
+                    function disableTelemetry() {
+                        if (gaId) {
+                            window["ga-disable-" + gaId] = true;
+                        }
+                    }
+
+                    function showBanner() {
+                        if (banner) banner.classList.remove("hidden");
+                    }
+
+                    function hideBanner() {
+                        if (banner) banner.classList.add("hidden");
+                    }
+
+                    function readConsent() {
+                        try {
+                            return localStorage.getItem(STORAGE_KEY);
+                        } catch {
+                            return null;
+                        }
+                    }
+
+                    function saveConsent(value) {
+                        try {
+                            localStorage.setItem(STORAGE_KEY, value);
+                        } catch {
+                            // Ignora indisponibilidade de storage (ex.: modo privado restrito)
+                        }
+                    }
+
+                    var saved = readConsent();
+                    if (saved === "accepted") {
+                        activateTelemetry();
+                    } else if (saved !== "rejected") {
+                        showBanner();
+                    }
+
+                    acceptBtn &&
+                        acceptBtn.addEventListener("click", function () {
+                            saveConsent("accepted");
+                            hideBanner();
+                            activateTelemetry();
+                        });
+
+                    rejectBtn &&
+                        rejectBtn.addEventListener("click", function () {
+                            saveConsent("rejected");
+                            hideBanner();
+                            disableTelemetry();
+                        });
+
+                    window.addEventListener("portal:open-cookie-preferences", function () {
+                        showBanner();
+                        acceptBtn && acceptBtn.focus();
+                    });
+                })();
+            </script>
+        </>
+    )
+}
